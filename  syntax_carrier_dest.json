@@ -1,0 +1,46 @@
+{
+    "syntaxes": [
+        {
+            "score": 0.8,
+            "name": "Treemap",
+            "syntax": "treemap x(carrier) color(carrier) size(#count) label(dest) tooltip(#all)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.77,
+            "name": "Tree",
+            "syntax": "tree x(carrier) size(#count) label(dest) tooltip(#all)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.75,
+            "name": "Scatterplot",
+            "syntax": "point x(carrier) y(dest) tooltip(#all)",
+            "description": "Two fields plotted against each other"
+        },
+        {
+            "score": 0.4670993664969138,
+            "name": "Heat Map",
+            "syntax": "x(carrier) y(dest) color(#count) sort(#count) tooltip(#all)",
+            "description": "A table of two fields, showing counts"
+        },
+        {
+            "score": 0.33441774365713206,
+            "name": "Stacked Counts",
+            "syntax": "bar x(dest) y(#count) stack color(carrier) tooltip(#all)",
+            "description": "A bar chart of counts, stacked by a second field"
+        },
+        {
+            "score": 0.33028912953790823,
+            "name": "Clustered Counts",
+            "syntax": "bar x(dest, carrier) y(#count) color(carrier) tooltip(#all)",
+            "description": "A bar chart of counts, clustered by a second field"
+        },
+        {
+            "score": 0.14132967144676306,
+            "name": "Map of Categories",
+            "syntax": "map color(dest) key(carrier) label(carrier) tooltip(carrier) mode(dest)",
+            "description": "A map colored by mode of a categorical field"
+        }
+    ]
+}

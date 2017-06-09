@@ -1,0 +1,40 @@
+{
+    "syntaxes": [
+        {
+            "score": 0.77,
+            "name": "Parallel Axes",
+            "syntax": "parallel y(carrier, distance, air_time) opacity(#selection:0.4)",
+            "description": "A chart with axes parallel"
+        },
+        {
+            "score": 0.75,
+            "name": "Bubble Plot",
+            "syntax": "point x(air_time) y(carrier) size(distance:200%) tooltip(#all)",
+            "description": "A scatter plot with sized bubbles"
+        },
+        {
+            "score": 0.6400000000000001,
+            "name": "Treemap",
+            "syntax": "treemap x(carrier, distance) color(distance) size(#count) label(air_time) tooltip(#all) bin(distance)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.6160000000000001,
+            "name": "Tree",
+            "syntax": "tree x(carrier, distance) size(#count) label(air_time) tooltip(#all) bin(distance)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.5303300858899107,
+            "name": "Symbol Plot",
+            "syntax": "point x(air_time) y(distance) color(carrier) symbol(carrier) tooltip(#all)",
+            "description": "A scatter plot with sized bubbles"
+        },
+        {
+            "score": 0.4355777772109133,
+            "name": "Stacked Area",
+            "syntax": "area x(air_time) y(distance) stack color(carrier) tooltip(#all)",
+            "description": "Two fields plotted against each other, stacked by a third"
+        }
+    ]
+}

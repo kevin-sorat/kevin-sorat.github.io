@@ -1,0 +1,700 @@
+<html>
+<head>
+<title></title>
+<link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/modelViewerChart.css"/>
+<link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/light/looks.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.1/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
+<script src="http://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
+<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
+<script src="https://brunelvis.org/js/brunel.2.4.min.js"</script>
+<script src="https://brunelvis.org/js/brunel.controls.2.4.min.js"</script>
+<style>
+</style>
+</head>
+<body>
+<svg id="visualization" width="600" height="600"></svg>
+<script>
+function  BrunelVis(visId) {
+  "use strict";                                                                       // strict mode
+  var datasets = [],                                      // array of datasets for the original data
+      pre = function(d, i) { return d },                         // default pre-process does nothing
+      post = function(d, i) { return d },                       // default post-process does nothing
+      transitionTime = 200,                                        // transition time for animations
+      charts = [],                                                       // the charts in the system
+      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
+
+  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
+
+  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
+
+  charts[0] = function(parentNode, filterRows) {
+    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 0, 0, 0, 0),
+      elements = [];                                              // array of elements in this chart
+
+    // Define groups for the chart parts ///////////////////////////////////////////////////////////
+
+    var chart =  vis.append('g').attr('class', 'chart1')
+      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
+    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
+    var zoom = d3.zoom().scaleExtent([1/2,10]);
+    var zoomNode = overlay.append('rect').attr('class', 'overlay')
+      .attr('x', geom.inner_left).attr('y', geom.inner_top)
+      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
+      .style('cursor', 'move').call(zoom)
+      .node();
+    zoomNode.__zoom = d3.zoomIdentity;
+    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
+    var interior = chart.append('g').attr('class', 'interior zoomNone')
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
+      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
+    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
+    var gridGroup = interior.append('g').attr('class', 'grid');
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
+      .attr('x', 0).attr('y', 0)
+      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
+    var tree, expandState = [], collapseState = {};    // collapse state maps node IDs to true/false
+    var graph;                                                                // the tree with links
+    var scale_x = d3.scaleLinear(), scale_y = d3.scaleLinear();
+    var base_scales = [scale_x, scale_y];                           // untransformed original scales
+    zoom.on('zoom', function(t, time) {
+        t = t || d3.event.transform;
+        scale_x = t.rescaleX(base_scales[0]);
+        scale_y = t.rescaleY(base_scales[1]);
+        zoomNode.__zoom = t;
+        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
+        build(time || -1);
+    });
+
+    // Define element #1 ///////////////////////////////////////////////////////////////////////////
+
+    elements[0] = function() {
+      var original, processed,                           // data sets passed in and then transformed
+        element, data,                                 // brunel element information and brunel data
+        selection, merged;                                      // d3 selection and merged selection
+      var elementGroup = interior.append('g').attr('class', 'element1'),
+        main = elementGroup.append('g').attr('class', 'main'),
+        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup),
+        diagramExtras = elementGroup.append('g').attr('class', 'extras'),
+        diagramLabels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'diagram labels').attr('aria-hidden', 'true'), elementGroup);
+
+      function makeData() {
+        original = datasets[0];
+        if (filterRows) original = original.retainRows(filterRows);
+        processed = pre(original, 0)
+          .transform('distance=bin')
+          .summarize('#count=#count:sum; carrier=carrier:base; distance=distance:base; air_time=air_time');
+        processed = post(processed, 0);
+        var f0 = processed.field('carrier'),
+          f1 = processed.field('distance'),
+          f2 = processed.field('#count'),
+          f3 = processed.field('air_time'),
+          f4 = processed.field('#row'),
+          f5 = processed.field('#selection');
+        var keyFunc = function(d) { return f4.value(d) };
+        data = {
+          carrier:      function(d) { return f0.value(d.row) },
+          distance:     function(d) { return f1.value(d.row) },
+          $count:       function(d) { return f2.value(d.row) },
+          air_time:     function(d) { return f3.value(d.row) },
+          $row:         function(d) { return f4.value(d.row) },
+          $selection:   function(d) { return f5.value(d.row) },
+          carrier_f:    function(d) { return f0.valueFormatted(d.row) },
+          distance_f:   function(d) { return f1.valueFormatted(d.row) },
+          $count_f:     function(d) { return f2.valueFormatted(d.row) },
+          air_time_f:   function(d) { return f3.valueFormatted(d.row) },
+          $row_f:       function(d) { return f4.valueFormatted(d.row) },
+          $selection_f: function(d) { return f5.valueFormatted(d.row) },
+          _split:       function(d) { return f2.value(d.row) },
+          _key:         keyFunc,
+          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
+        };
+      }
+      // Aesthetic Functions
+      var scale_size = d3.scaleSqrt().domain([0, 10.000001])
+        .range([ 0.001, 1]);
+      var size = function(d) { return scale_size(d.value) };
+
+      // Build element from data ///////////////////////////////////////////////////////////////////
+
+      function build(transitionMillis) {
+        element = elements[0];
+        // Define tree (hierarchy) data structures
+        var first = (!tree);
+        graph = BrunelData.diagram_Hierarchical.makeByNestingFields(processed, null, '#count', 'carrier', 'distance');
+        var targetNode = graph.root;
+        tree = d3.hierarchy(targetNode).sum(function(d) { return d.value });
+        BrunelD3.prune(tree, collapseState, false);
+        function nodeKey(d) { return d.data.key == null ? data._key(d.data.row) : d.data.key };
+        var treeLayout = d3.tree()
+          .size([geom.inner_height-40, geom.inner_width-76]);
+        var treeNodes = treeLayout(tree).descendants();
+        BrunelD3.copyTreeLayoutInfo(treeNodes, graph, 20);
+        main.attr('class', 'diagram tree hierarchy');
+        // Define Coordinate functions
+        function r(d) { return d.data.radius = size(d) * geom.default_point_size / 2 };
+        function x(d) { return scale_x(d.y) };
+        function y(d) { return scale_y(d.x) };
+        var labeling  = [{
+          index: 0, method: 'box', location: ['right', 'center'], inside: false, align: 'start', pad: 3, dy: 0.3,
+          fit: false, granularity: 8,
+          content: function(d) {
+            return d.row == null ? null : data.air_time_f(d)
+          }
+        }];
+
+        // Define selection entry operations
+        function initialState(selection) {
+          selection
+            .attr('class', 'element point filled')
+        }
+
+        // Define selection update operations on merged data
+        function updateState(selection) {
+          selection
+            .attr('class', function(d) { return (d.collapsed ? 'collapsed ' : '') + (d.data.children ? 'element L' + d.depth : 'leaf element point') })
+            .attr('cx',function(d) { return x(d)})
+            .attr('cy',function(d) { return y(d)})
+            .attr('r',function(d) { return r(d) * 2 / 2})
+
+          // Add in the arcs on the outside for the groups
+          diagramExtras.attr('class', 'diagram tree edge');
+          function edgeKey(d) { return nodeKey(d.source) + '%' + nodeKey(d.target) };
+          var edgeGroup = diagramExtras.selectAll('path').data(tree.links(), edgeKey);
+          var added = edgeGroup.enter().append('path').attr('class', 'edge')
+            .attr('d', function(d) {
+              var p = BrunelD3.insetEdge(scale_x(d.source.y), scale_y(d.source.x), d.source,
+                scale_x(d.target.y), scale_y(d.target.x), d.target);
+              return 'M' + p.x1 + ',' + p.y1 + 
+                'C' + (p.x1+p.x2)/2 + ',' + p.y1
+                 + ' ' + (p.x1+p.x2)/2 + ',' + p.y2 + ' ' 
+                + p.x2 + ',' + p.y2;
+          });
+          BrunelD3.transition(edgeGroup.merge(added), transitionMillis)
+            .attr('d', function(d) {
+              var p = BrunelD3.insetEdge(scale_x(d.source.y), scale_y(d.source.x), d.source,
+                scale_x(d.target.y), scale_y(d.target.x), d.target);
+              return 'M' + p.x1 + ',' + p.y1 + 
+                'C' + (p.x1+p.x2)/2 + ',' + p.y1
+                 + ' ' + (p.x1+p.x2)/2 + ',' + p.y2 + ' ' 
+                + p.x2 + ',' + p.y2;
+          });
+
+          BrunelD3.transition(edgeGroup.exit(), transitionMillis/3)
+            .style('opacity', 0.5).each( function() {
+              this.remove(); BrunelD3.removeLabels(this); 
+          });
+          diagramLabels.attr('class', 'axis diagram tree hierarchy');
+          var treeLabeling = [{ location:['center', 'bottom'], fit:false, dy:0.75, align:'middle', granularity:1, 
+            content:  function(d) { return d.data.innerNodeName },
+            cssClass: function(d) { return 'axis label L' + d.depth + ' H' + d.height } 
+          }];
+          BrunelD3.label(selection.filter(function(d) {return d.data.innerNodeName}), diagramLabels, transitionMillis, geom, treeLabeling);
+          ;
+          ;
+        }
+
+        // Define labeling for the selection
+        function label(selection, transitionMillis) {
+          BrunelD3.label(selection, labels, transitionMillis, geom, labeling);
+
+          var tooltipLabeling  = {
+            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
+            fit: true, granularity: 0,
+            content: function(d) {
+              return d.row == null ? null : '<span class="title">carrier: </span>'
+			+ '<span class="field">' + data.carrier_f(d) + '</span>'
+			+ '<br/>'
+			+ '<span class="title">distance: </span>'
+			+ '<span class="field">' + data.distance_f(d) + '</span>'
+			+ '<br/>'
+			+ '<span class="title">Count: </span>'
+			+ '<span class="field">' + data.$count_f(d) + '</span>'
+			+ '<br/>'
+			+ '<span class="title">air_time: </span>'
+			+ '<span class="field">' + data.air_time_f(d) + '</span>'
+            }
+          };
+          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
+        }
+        // Create selections, set the initial state and transition updates
+        selection = main.selectAll('.element').data(treeNodes, nodeKey);
+        var added = selection.enter().append('circle');
+        merged = selection.merge(added);
+        initialState(added);
+        selection.filter(BrunelD3.hasData)
+          .classed('selected', BrunelD3.isSelected(data))
+          .filter(BrunelD3.isSelected(data)).raise();
+        updateState(BrunelD3.transition(merged, transitionMillis));
+        label(merged, transitionMillis);
+
+        BrunelD3.transition(selection.exit(), transitionMillis/3)
+          .style('opacity', 0.5).each( function() {
+            this.remove(); BrunelD3.removeLabels(this); 
+        });
+        merged                                                     // attach handlers to the element
+          .on('dblclick.collapse', function(d) {if (d.data.children) {collapseState[d.data.key] = !collapseState[d.data.key]; charts[0].build(500)}  });
+      }
+
+      return {
+        data:           function() { return processed },
+        original:       function() { return original },
+        internal:       function() { return data },
+        selection:      function() { return merged },
+        makeData:       makeData,
+        build:          build,
+        chart:          function() { return charts[0] },
+        group:          function() { return elementGroup },
+        fields: {
+          x:            ['carrier', 'distance'],
+          key:          ['#row'],
+          size:         ['#count']
+        }
+      };
+    }();
+
+    function build(time, noData) {
+      var first = elements[0].data() == null;
+      if (first) time = 0;                                           // no transition for first call
+      if ((first || time > -1) && !noData) {
+        elements[0].makeData();
+      }
+      elements[0].build(time);
+    }
+
+    // Expose the following components of the chart
+    return {
+      elements : elements,
+      interior : interior,
+      zoom: function(params, time) {
+          if (params) zoom.on('zoom').call(zoomNode, params, time);
+          return d3.zoomTransform(zoomNode);
+      },
+      build : build
+    };
+    }();
+
+  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
+  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
+  function buildAll() {
+    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
+    updateAll(transitionTime);
+  }
+
+  return {
+    dataPreProcess:     function(f) { if (f) pre = f; return pre },
+    dataPostProcess:    function(f) { if (f) post = f; return post },
+    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
+    visId:              visId,
+    build:              buildAll,
+    rebuild:            updateAll,
+    charts:             charts
+  }
+}
+
+// Data Tables /////////////////////////////////////////////////////////////////////////////////////
+
+var table1 = {
+   summarized: true,
+   names: ['carrier', 'distance', '#count', 'air_time'], 
+   options: ['string', 'range-numeric', 'numeric', 'numeric'], 
+   rows: [['EV', [0,200], 2, 24], ['EV', [0,200], 2, 25], ['EV', [0,200], 1, 28],
+  ['US', [0,200], 1, 28], ['9E', [0,200], 1, 29], ['EV', [0,200], 1, 29], ['9E', [0,200], 3, 30],
+  ['EV', [0,200], 1, 30], ['EV', [0,200], 2, 31], ['US', [0,200], 1, 31], ['US', [0,200], 1, 32],
+  ['9E', [0,200], 1, 33], ['EV', [0,200], 2, 33], ['EV', [200,400], 1, 33], ['AA', [0,200], 1, 34],
+  ['B6', [0,200], 2, 34], ['DL', [0,200], 1, 34], ['UA', [200,400], 2, 34], ['US', [0,200], 1, 34],
+  ['9E', [0,200], 1, 35], ['AA', [0,200], 1, 35], ['B6', [0,200], 1, 35], ['B6', [200,400], 1, 35],
+  ['EV', [0,200], 1, 35], ['UA', [200,400], 3, 35], ['WN', [0,200], 1, 35], ['AA', [0,200], 1, 36],
+  ['B6', [0,200], 2, 36], ['B6', [200,400], 1, 36], ['DL', [0,200], 2, 36], ['EV', [0,200], 2, 36],
+  ['MQ', [0,200], 1, 36], ['UA', [200,400], 2, 36], ['WN', [0,200], 2, 36], ['AA', [0,200], 1, 37],
+  ['B6', [0,200], 2, 37], ['DL', [0,200], 1, 37], ['EV', [0,200], 2, 37], ['EV', [200,400], 2, 37],
+  ['UA', [200,400], 1, 37], ['AA', [0,200], 1, 38], ['B6', [0,200], 2, 38], ['B6', [200,400], 3, 38],
+  ['DL', [0,200], 1, 38], ['EV', [0,200], 1, 38], ['EV', [200,400], 2, 38], ['UA', [200,400], 1, 38],
+  ['US', [0,200], 1, 38], ['WN', [0,200], 1, 38], ['9E', [0,200], 2, 39], ['B6', [0,200], 1, 39],
+  ['EV', [0,200], 1, 39], ['EV', [200,400], 1, 39], ['UA', [200,400], 2, 39], ['WN', [0,200], 1, 39],
+  ['9E', [0,200], 1, 40], ['AA', [0,200], 1, 40], ['B6', [0,200], 2, 40], ['B6', [200,400], 1, 40],
+  ['EV', [0,200], 1, 40], ['UA', [200,400], 1, 40], ['WN', [0,200], 2, 40], ['9E', [0,200], 4, 41],
+  ['AA', [0,200], 1, 41], ['B6', [0,200], 1, 41], ['EV', [0,200], 1, 41], ['EV', [200,400], 1, 41],
+  ['MQ', [0,200], 1, 41], ['UA', [200,400], 1, 41], ['US', [0,200], 1, 41], ['9E', [200,400], 2, 42],
+  ['AA', [0,200], 1, 42], ['B6', [200,400], 1, 42], ['UA', [200,400], 1, 42], ['WN', [0,200], 2, 42],
+  ['9E', [200,400], 2, 43], ['B6', [0,200], 1, 43], ['EV', [0,200], 1, 43], ['MQ', [200,400], 1, 43],
+  ['WN', [0,200], 2, 43], ['B6', [0,200], 1, 44], ['B6', [200,400], 1, 44], ['EV', [0,200], 2, 44],
+  ['EV', [200,400], 1, 44], ['UA', [200,400], 1, 44], ['AA', [0,200], 1, 45],
+  ['B6', [200,400], 3, 45], ['EV', [0,200], 4, 45], ['9E', [0,200], 1, 46], ['DL', [200,400], 1, 46],
+  ['EV', [0,200], 3, 46], ['EV', [200,400], 1, 46], ['US', [200,400], 2, 46], ['WN', [0,200], 1, 46],
+  ['B6', [200,400], 2, 47], ['EV', [200,400], 8, 47], ['US', [200,400], 1, 47],
+  ['B6', [200,400], 1, 48], ['EV', [0,200], 2, 48], ['EV', [200,400], 6, 48],
+  ['US', [200,400], 1, 48], ['9E', [200,400], 1, 49], ['B6', [200,400], 3, 49],
+  ['EV', [200,400], 5, 49], ['MQ', [200,400], 1, 49], ['B6', [200,400], 2, 50],
+  ['DL', [200,400], 1, 50], ['EV', [200,400], 4, 50], ['MQ', [200,400], 2, 50],
+  ['US', [200,400], 1, 50], ['B6', [200,400], 1, 51], ['EV', [200,400], 8, 51],
+  ['US', [200,400], 1, 51], ['B6', [200,400], 5, 52], ['EV', [200,400], 4, 52],
+  ['MQ', [200,400], 2, 52], ['B6', [200,400], 2, 53], ['EV', [200,400], 7, 53],
+  ['US', [200,400], 1, 53], ['9E', [200,400], 1, 54], ['B6', [200,400], 1, 54],
+  ['EV', [200,400], 3, 54], ['MQ', [200,400], 2, 54], ['US', [200,400], 1, 54],
+  ['B6', [200,400], 1, 55], ['EV', [200,400], 3, 55], ['MQ', [200,400], 2, 55],
+  ['9E', [200,400], 1, 56], ['DL', [200,400], 1, 56], ['EV', [200,400], 4, 56],
+  ['9E', [200,400], 3, 57], ['B6', [200,400], 2, 57], ['DL', [200,400], 1, 57],
+  ['EV', [200,400], 4, 57], ['MQ', [200,400], 3, 57], ['9E', [200,400], 1, 58],
+  ['B6', [200,400], 3, 58], ['EV', [200,400], 2, 58], ['9E', [200,400], 3, 59],
+  ['B6', [200,400], 4, 59], ['EV', [200,400], 4, 59], ['MQ', [200,400], 1, 59],
+  ['B6', [200,400], 2, 60], ['DL', [200,400], 2, 60], ['EV', [200,400], 1, 60],
+  ['MQ', [200,400], 1, 60], ['B6', [200,400], 2, 61], ['DL', [200,400], 1, 61],
+  ['EV', [200,400], 4, 61], ['9E', [200,400], 1, 62], ['B6', [200,400], 1, 62],
+  ['9E', [200,400], 1, 63], ['B6', [200,400], 3, 63], ['EV', [200,400], 2, 63],
+  ['9E', [200,400], 1, 64], ['B6', [200,400], 2, 64], ['UA', [400,600], 1, 64],
+  ['B6', [200,400], 2, 65], ['EV', [200,400], 2, 65], ['9E', [200,400], 1, 66],
+  ['B6', [200,400], 2, 66], ['FL', [200,400], 1, 66], ['UA', [400,600], 1, 67],
+  ['9E', [200,400], 2, 68], ['EV', [200,400], 2, 68], ['EV', [200,400], 2, 69],
+  ['FL', [200,400], 1, 69], ['9E', [200,400], 1, 70], ['B6', [200,400], 2, 70],
+  ['MQ', [400,600], 1, 70], ['B6', [200,400], 2, 71], ['MQ', [200,400], 1, 71],
+  ['MQ', [400,600], 1, 71], ['9E', [400,600], 1, 72], ['EV', [200,400], 1, 73],
+  ['EV', [400,600], 1, 73], ['FL', [200,400], 1, 73], ['MQ', [400,600], 1, 74],
+  ['UA', [400,600], 1, 74], ['9E', [400,600], 1, 75], ['EV', [400,600], 1, 75],
+  ['MQ', [400,600], 1, 75], ['UA', [400,600], 1, 75], ['9E', [200,400], 1, 76],
+  ['MQ', [400,600], 1, 76], ['B6', [200,400], 1, 77], ['MQ', [400,600], 2, 77],
+  ['UA', [400,600], 1, 77], ['B6', [400,600], 1, 78], ['DL', [400,600], 1, 78],
+  ['EV', [400,600], 3, 78], ['MQ', [400,600], 2, 78], ['MQ', [200,400], 1, 79],
+  ['MQ', [400,600], 4, 79], ['UA', [400,600], 3, 79], ['B6', [400,600], 1, 80],
+  ['EV', [400,600], 1, 80], ['MQ', [400,600], 8, 80], ['B6', [400,600], 1, 81],
+  ['DL', [400,600], 1, 81], ['EV', [400,600], 1, 81], ['MQ', [400,600], 5, 81],
+  ['9E', [400,600], 1, 82], ['EV', [400,600], 2, 82], ['FL', [200,400], 1, 82],
+  ['MQ', [400,600], 3, 82], ['9E', [400,600], 1, 83], ['B6', [400,600], 1, 83],
+  ['EV', [400,600], 2, 83], ['MQ', [400,600], 5, 83], ['UA', [400,600], 1, 83],
+  ['MQ', [400,600], 1, 84], ['UA', [400,600], 1, 84], ['EV', [400,600], 1, 85],
+  ['MQ', [400,600], 5, 85], ['UA', [400,600], 1, 85], ['B6', [200,400], 1, 86],
+  ['B6', [400,600], 1, 86], ['EV', [400,600], 2, 86], ['MQ', [400,600], 2, 86],
+  ['9E', [400,600], 1, 87], ['B6', [200,400], 1, 87], ['DL', [400,600], 1, 87],
+  ['MQ', [400,600], 1, 87], ['UA', [400,600], 1, 87], ['B6', [400,600], 1, 88],
+  ['DL', [400,600], 1, 88], ['EV', [400,600], 1, 88], ['MQ', [400,600], 2, 88],
+  ['UA', [400,600], 1, 88], ['EV', [400,600], 1, 89], ['MQ', [400,600], 3, 89],
+  ['DL', [400,600], 1, 90], ['EV', [400,600], 1, 90], ['MQ', [400,600], 2, 90],
+  ['US', [400,600], 2, 90], ['9E', [400,600], 3, 91], ['B6', [400,600], 1, 91],
+  ['DL', [400,600], 1, 91], ['EV', [400,600], 2, 91], ['MQ', [400,600], 2, 91],
+  ['UA', [400,600], 1, 91], ['US', [400,600], 4, 91], ['DL', [400,600], 3, 92],
+  ['EV', [400,600], 2, 92], ['MQ', [400,600], 2, 92], ['9E', [400,600], 3, 93],
+  ['DL', [400,600], 1, 93], ['MQ', [400,600], 2, 93], ['US', [400,600], 1, 93],
+  ['DL', [400,600], 2, 94], ['EV', [400,600], 2, 94], ['MQ', [400,600], 3, 94],
+  ['US', [400,600], 4, 94], ['9E', [200,400], 1, 95], ['DL', [400,600], 1, 95],
+  ['EV', [400,600], 4, 95], ['MQ', [400,600], 1, 95], ['US', [400,600], 2, 95],
+  ['DL', [400,600], 1, 96], ['EV', [400,600], 1, 96], ['MQ', [400,600], 2, 96],
+  ['US', [400,600], 4, 96], ['9E', [400,600], 1, 97], ['DL', [400,600], 1, 97],
+  ['EV', [400,600], 1, 97], ['MQ', [400,600], 1, 97], ['US', [400,600], 3, 97],
+  ['B6', [400,600], 1, 98], ['EV', [400,600], 2, 98], ['MQ', [400,600], 3, 98],
+  ['US', [400,600], 1, 98], ['DL', [400,600], 2, 99], ['MQ', [400,600], 2, 99],
+  ['US', [400,600], 4, 99], ['EV', [400,600], 2, 100], ['EV', [600,800], 1, 100],
+  ['MQ', [400,600], 1, 100], ['US', [400,600], 4, 100], ['DL', [400,600], 1, 101],
+  ['EV', [600,800], 1, 101], ['MQ', [400,600], 2, 101], ['EV', [400,600], 5, 102],
+  ['EV', [600,800], 1, 102], ['MQ', [400,600], 2, 102], ['US', [400,600], 3, 102],
+  ['EV', [400,600], 1, 103], ['MQ', [400,600], 3, 103], ['US', [400,600], 6, 103],
+  ['9E', [600,800], 1, 104], ['DL', [400,600], 1, 104], ['EV', [400,600], 1, 104],
+  ['US', [400,600], 4, 104], ['DL', [400,600], 1, 105], ['EV', [400,600], 3, 105],
+  ['EV', [600,800], 1, 105], ['MQ', [400,600], 2, 105], ['9E', [600,800], 1, 106],
+  ['DL', [400,600], 1, 106], ['EV', [400,600], 4, 106], ['EV', [600,800], 1, 106],
+  ['MQ', [400,600], 3, 106], ['US', [400,600], 3, 106], ['9E', [400,600], 1, 107],
+  ['EV', [400,600], 2, 107], ['UA', [600,800], 1, 107], ['US', [400,600], 2, 107],
+  ['B6', [400,600], 1, 108], ['DL', [400,600], 4, 108], ['EV', [400,600], 3, 108],
+  ['EV', [600,800], 1, 108], ['US', [400,600], 1, 108], ['EV', [400,600], 2, 109],
+  ['EV', [600,800], 2, 109], ['US', [400,600], 2, 109], ['DL', [400,600], 2, 110],
+  ['US', [400,600], 2, 110], ['9E', [400,600], 2, 111], ['EV', [600,800], 1, 111],
+  ['MQ', [600,800], 1, 111], ['UA', [600,800], 1, 111], ['US', [400,600], 1, 111],
+  ['B6', [400,600], 1, 112], ['MQ', [400,600], 1, 112], ['MQ', [600,800], 2, 112],
+  ['9E', [400,600], 1, 113], ['EV', [400,600], 1, 113], ['EV', [600,800], 1, 113],
+  ['FL', [600,800], 1, 113], ['EV', [400,600], 1, 114], ['UA', [600,800], 1, 114],
+  ['WN', [600,800], 1, 114], ['9E', [400,600], 1, 115], ['MQ', [600,800], 2, 115],
+  ['9E', [400,600], 1, 116], ['9E', [600,800], 1, 116], ['AA', [600,800], 1, 116],
+  ['DL', [600,800], 1, 116], ['EV', [600,800], 3, 116], ['MQ', [600,800], 1, 116],
+  ['DL', [400,600], 1, 117], ['EV', [600,800], 2, 117], ['WN', [600,800], 1, 117],
+  ['9E', [400,600], 1, 118], ['AA', [600,800], 2, 118], ['EV', [400,600], 1, 118],
+  ['MQ', [400,600], 3, 118], ['MQ', [600,800], 1, 118], ['WN', [600,800], 1, 118],
+  ['AA', [600,800], 1, 119], ['DL', [600,800], 1, 119], ['EV', [400,600], 1, 119],
+  ['9E', [400,600], 1, 120], ['DL', [600,800], 1, 120], ['EV', [600,800], 1, 120],
+  ['9E', [600,800], 1, 121], ['AA', [600,800], 1, 121], ['DL', [600,800], 1, 121],
+  ['EV', [400,600], 2, 121], ['EV', [600,800], 2, 121], ['MQ', [600,800], 1, 121],
+  ['WN', [600,800], 2, 121], ['AA', [600,800], 1, 122], ['DL', [600,800], 2, 122],
+  ['EV', [400,600], 1, 122], ['EV', [600,800], 1, 122], ['FL', [600,800], 2, 122],
+  ['WN', [600,800], 1, 122], ['9E', [600,800], 1, 123], ['AA', [600,800], 2, 123],
+  ['DL', [600,800], 1, 123], ['EV', [400,600], 1, 123], ['FL', [600,800], 1, 123],
+  ['MQ', [600,800], 2, 123], ['UA', [600,800], 1, 123], ['WN', [600,800], 3, 123],
+  ['AA', [600,800], 1, 124], ['DL', [600,800], 3, 124], ['EV', [600,800], 1, 124],
+  ['FL', [600,800], 1, 124], ['MQ', [600,800], 2, 124], ['WN', [600,800], 1, 124],
+  ['AA', [600,800], 1, 125], ['DL', [600,800], 7, 125], ['EV', [600,800], 1, 125],
+  ['MQ', [600,800], 1, 125], ['UA', [600,800], 2, 125], ['AA', [600,800], 2, 126],
+  ['DL', [600,800], 10, 126], ['EV', [600,800], 2, 126], ['MQ', [600,800], 1, 126],
+  ['UA', [600,800], 2, 126], ['WN', [600,800], 1, 126], ['AA', [600,800], 2, 127],
+  ['DL', [600,800], 4, 127], ['FL', [600,800], 1, 127], ['MQ', [600,800], 2, 127],
+  ['UA', [600,800], 1, 127], ['WN', [600,800], 2, 127], ['9E', [800,1000], 1, 128],
+  ['DL', [600,800], 7, 128], ['EV', [600,800], 1, 128], ['FL', [600,800], 2, 128],
+  ['MQ', [600,800], 3, 128], ['9E', [800,1000], 1, 129], ['AA', [600,800], 1, 129],
+  ['DL', [600,800], 8, 129], ['EV', [400,600], 1, 129], ['EV', [600,800], 1, 129],
+  ['FL', [600,800], 3, 129], ['MQ', [600,800], 3, 129], ['UA', [600,800], 4, 129],
+  ['WN', [600,800], 1, 129], ['AA', [600,800], 1, 130], ['B6', [800,1000], 1, 130],
+  ['DL', [600,800], 4, 130], ['EV', [600,800], 1, 130], ['FL', [600,800], 2, 130],
+  ['MQ', [600,800], 1, 130], ['WN', [600,800], 1, 130], ['9E', [400,600], 1, 131],
+  ['B6', [800,1000], 1, 131], ['DL', [600,800], 3, 131], ['EV', [600,800], 3, 131],
+  ['EV', [800,1000], 2, 131], ['MQ', [600,800], 2, 131], ['WN', [600,800], 2, 131],
+  ['AA', [600,800], 1, 132], ['DL', [600,800], 3, 132], ['EV', [600,800], 3, 132],
+  ['EV', [800,1000], 1, 132], ['FL', [600,800], 2, 132], ['AA', [600,800], 4, 133],
+  ['B6', [600,800], 1, 133], ['B6', [800,1000], 2, 133], ['DL', [600,800], 1, 133],
+  ['DL', [800,1000], 2, 133], ['EV', [600,800], 1, 133], ['FL', [600,800], 1, 133],
+  ['MQ', [600,800], 1, 133], ['WN', [600,800], 1, 133], ['B6', [800,1000], 1, 134],
+  ['DL', [600,800], 1, 134], ['EV', [600,800], 1, 134], ['FL', [600,800], 3, 134],
+  ['MQ', [600,800], 5, 134], ['UA', [600,800], 2, 134], ['WN', [600,800], 2, 134],
+  ['AA', [600,800], 1, 135], ['DL', [600,800], 4, 135], ['EV', [600,800], 2, 135],
+  ['FL', [600,800], 1, 135], ['MQ', [600,800], 1, 135], ['UA', [600,800], 4, 135],
+  ['AA', [600,800], 1, 136], ['B6', [800,1000], 1, 136], ['EV', [600,800], 1, 136],
+  ['MQ', [600,800], 3, 136], ['UA', [600,800], 2, 136], ['UA', [800,1000], 1, 136],
+  ['AA', [600,800], 2, 137], ['B6', [800,1000], 2, 137], ['EV', [600,800], 1, 137],
+  ['EV', [800,1000], 1, 137], ['MQ', [600,800], 1, 137], ['UA', [600,800], 2, 137],
+  ['UA', [800,1000], 1, 137], ['WN', [600,800], 2, 137], ['AA', [600,800], 2, 138],
+  ['B6', [600,800], 1, 138], ['B6', [800,1000], 1, 138], ['EV', [600,800], 4, 138],
+  ['MQ', [600,800], 1, 138], ['UA', [600,800], 2, 138], ['9E', [600,800], 2, 139],
+  ['B6', [800,1000], 2, 139], ['EV', [600,800], 1, 139], ['MQ', [600,800], 4, 139],
+  ['WN', [600,800], 1, 139], ['AA', [600,800], 1, 140], ['B6', [800,1000], 8, 140],
+  ['DL', [800,1000], 2, 140], ['EV', [600,800], 1, 140], ['UA', [600,800], 1, 140],
+  ['UA', [800,1000], 1, 140], ['9E', [600,800], 1, 141], ['AA', [600,800], 1, 141],
+  ['AA', [800,1000], 1, 141], ['B6', [800,1000], 1, 141], ['MQ', [600,800], 1, 141],
+  ['UA', [600,800], 1, 141], ['UA', [800,1000], 1, 141], ['WN', [600,800], 2, 141],
+  ['AA', [800,1000], 1, 142], ['B6', [800,1000], 4, 142], ['DL', [800,1000], 1, 142],
+  ['DL', [1000,1200], 1, 142], ['EV', [600,800], 1, 142], ['MQ', [600,800], 1, 142],
+  ['UA', [600,800], 1, 142], ['UA', [800,1000], 1, 142], ['UA', [1000,1200], 1, 142],
+  ['WN', [600,800], 1, 142], ['9E', [600,800], 2, 143], ['AA', [600,800], 1, 143],
+  ['B6', [800,1000], 1, 143], ['B6', [1000,1200], 1, 143], ['DL', [800,1000], 3, 143],
+  ['EV', [600,800], 1, 143], ['EV', [800,1000], 1, 143], ['MQ', [600,800], 1, 143],
+  ['UA', [600,800], 2, 143], ['UA', [800,1000], 2, 143], ['WN', [600,800], 1, 143],
+  ['AA', [800,1000], 1, 144], ['B6', [800,1000], 6, 144], ['DL', [800,1000], 1, 144],
+  ['DL', [1000,1200], 1, 144], ['EV', [1000,1200], 1, 144], ['MQ', [600,800], 1, 144],
+  ['UA', [600,800], 1, 144], ['UA', [800,1000], 1, 144], ['B6', [800,1000], 1, 145],
+  ['B6', [1000,1200], 1, 145], ['DL', [800,1000], 2, 145], ['EV', [600,800], 1, 145],
+  ['UA', [600,800], 1, 145], ['UA', [800,1000], 2, 145], ['UA', [1000,1200], 1, 145],
+  ['WN', [600,800], 1, 145], ['9E', [600,800], 1, 146], ['AA', [600,800], 2, 146],
+  ['AA', [800,1000], 1, 146], ['AA', [1000,1200], 1, 146], ['B6', [800,1000], 4, 146],
+  ['B6', [1000,1200], 2, 146], ['UA', [600,800], 1, 146], ['UA', [800,1000], 1, 146],
+  ['UA', [1000,1200], 1, 146], ['WN', [600,800], 1, 146], ['AA', [600,800], 2, 147],
+  ['B6', [800,1000], 1, 147], ['B6', [1000,1200], 3, 147], ['DL', [800,1000], 1, 147],
+  ['UA', [800,1000], 1, 147], ['UA', [1000,1200], 1, 147], ['AA', [800,1000], 1, 148],
+  ['B6', [800,1000], 2, 148], ['B6', [1000,1200], 2, 148], ['DL', [800,1000], 1, 148],
+  ['DL', [1000,1200], 1, 148], ['EV', [600,800], 1, 148], ['MQ', [600,800], 1, 148],
+  ['UA', [800,1000], 2, 148], ['WN', [600,800], 1, 148], ['AA', [800,1000], 1, 149],
+  ['B6', [1000,1200], 6, 149], ['DL', [1000,1200], 4, 149], ['EV', [600,800], 1, 149],
+  ['MQ', [600,800], 1, 149], ['UA', [600,800], 1, 149], ['UA', [800,1000], 1, 149],
+  ['UA', [1000,1200], 3, 149], ['9E', [600,800], 2, 150], ['B6', [600,800], 1, 150],
+  ['B6', [800,1000], 2, 150], ['B6', [1000,1200], 3, 150], ['DL', [800,1000], 2, 150],
+  ['DL', [1000,1200], 1, 150], ['UA', [600,800], 1, 150], ['UA', [800,1000], 3, 150],
+  ['UA', [1000,1200], 2, 150], ['AA', [1000,1200], 1, 151], ['B6', [600,800], 1, 151],
+  ['B6', [800,1000], 1, 151], ['B6', [1000,1200], 3, 151], ['DL', [800,1000], 1, 151],
+  ['DL', [1000,1200], 2, 151], ['EV', [600,800], 1, 151], ['EV', [800,1000], 1, 151],
+  ['UA', [800,1000], 2, 151], ['UA', [1000,1200], 3, 151], ['AA', [1000,1200], 1, 152],
+  ['B6', [800,1000], 2, 152], ['B6', [1000,1200], 4, 152], ['DL', [800,1000], 1, 152],
+  ['DL', [1000,1200], 2, 152], ['EV', [600,800], 1, 152], ['MQ', [600,800], 1, 152],
+  ['UA', [800,1000], 2, 152], ['UA', [1000,1200], 2, 152], ['WN', [800,1000], 1, 152],
+  ['9E', [1000,1200], 1, 153], ['AA', [1000,1200], 2, 153], ['B6', [800,1000], 1, 153],
+  ['B6', [1000,1200], 4, 153], ['DL', [800,1000], 1, 153], ['DL', [1000,1200], 3, 153],
+  ['MQ', [600,800], 1, 153], ['UA', [800,1000], 1, 153], ['UA', [1000,1200], 1, 153],
+  ['AA', [1000,1200], 1, 154], ['B6', [800,1000], 2, 154], ['B6', [1000,1200], 3, 154],
+  ['DL', [1000,1200], 2, 154], ['EV', [600,800], 2, 154], ['MQ', [600,800], 2, 154],
+  ['UA', [600,800], 1, 154], ['UA', [1000,1200], 2, 154], ['AA', [800,1000], 1, 155],
+  ['AA', [1000,1200], 3, 155], ['B6', [1000,1200], 3, 155], ['DL', [1000,1200], 5, 155],
+  ['EV', [1000,1200], 1, 155], ['AA', [1000,1200], 4, 156], ['B6', [800,1000], 2, 156],
+  ['B6', [1000,1200], 5, 156], ['DL', [1000,1200], 3, 156], ['UA', [600,800], 1, 156],
+  ['UA', [800,1000], 2, 156], ['UA', [1000,1200], 5, 156], ['AA', [1000,1200], 3, 157],
+  ['B6', [1000,1200], 4, 157], ['DL', [800,1000], 3, 157], ['DL', [1000,1200], 4, 157],
+  ['MQ', [1000,1200], 1, 157], ['UA', [1000,1200], 6, 157], ['AA', [800,1000], 1, 158],
+  ['AA', [1000,1200], 4, 158], ['B6', [800,1000], 2, 158], ['B6', [1000,1200], 7, 158],
+  ['DL', [800,1000], 1, 158], ['DL', [1000,1200], 8, 158], ['UA', [800,1000], 4, 158],
+  ['UA', [1000,1200], 3, 158], ['AA', [1000,1200], 6, 159], ['B6', [1000,1200], 5, 159],
+  ['DL', [1000,1200], 7, 159], ['EV', [600,800], 1, 159], ['EV', [1000,1200], 1, 159],
+  ['MQ', [1000,1200], 1, 159], ['UA', [800,1000], 2, 159], ['UA', [1000,1200], 2, 159],
+  ['WN', [800,1000], 1, 159], ['AA', [800,1000], 1, 160], ['AA', [1000,1200], 6, 160],
+  ['B6', [600,800], 1, 160], ['B6', [1000,1200], 9, 160], ['DL', [1000,1200], 6, 160],
+  ['UA', [800,1000], 1, 160], ['AA', [800,1000], 1, 161], ['AA', [1000,1200], 5, 161],
+  ['B6', [800,1000], 1, 161], ['B6', [1000,1200], 2, 161], ['DL', [1000,1200], 3, 161],
+  ['UA', [1000,1200], 5, 161], ['B6', [1000,1200], 6, 162], ['DL', [1000,1200], 2, 162],
+  ['UA', [800,1000], 1, 162], ['UA', [1000,1200], 2, 162], ['WN', [800,1000], 1, 162],
+  ['AA', [1000,1200], 5, 163], ['B6', [800,1000], 1, 163], ['B6', [1000,1200], 3, 163],
+  ['DL', [1000,1200], 3, 163], ['MQ', [1000,1200], 2, 163], ['9E', [1000,1200], 1, 164],
+  ['AA', [1000,1200], 1, 164], ['B6', [1000,1200], 3, 164], ['DL', [1000,1200], 3, 164],
+  ['UA', [800,1000], 1, 164], ['UA', [1000,1200], 2, 164], ['B6', [1000,1200], 6, 165],
+  ['DL', [1000,1200], 1, 165], ['MQ', [1000,1200], 1, 165], ['9E', [800,1000], 1, 166],
+  ['AA', [1000,1200], 1, 166], ['B6', [1000,1200], 2, 166], ['DL', [1000,1200], 3, 166],
+  ['MQ', [1000,1200], 1, 166], ['UA', [1000,1200], 4, 166], ['9E', [1000,1200], 1, 167],
+  ['AA', [1000,1200], 2, 167], ['B6', [1000,1200], 6, 167], ['DL', [1000,1200], 3, 167],
+  ['MQ', [1000,1200], 1, 167], ['UA', [1000,1200], 1, 167], ['AA', [1000,1200], 1, 168],
+  ['B6', [1000,1200], 6, 168], ['DL', [800,1000], 2, 168], ['DL', [1000,1200], 3, 168],
+  ['EV', [600,800], 1, 168], ['UA', [1000,1200], 3, 168], ['AA', [800,1000], 2, 169],
+  ['AA', [1000,1200], 1, 169], ['B6', [1000,1200], 1, 169], ['DL', [1000,1200], 4, 169],
+  ['B6', [1000,1200], 4, 170], ['DL', [1000,1200], 2, 170], ['EV', [800,1000], 1, 170],
+  ['MQ', [1000,1200], 1, 170], ['AA', [1000,1200], 2, 171], ['B6', [1000,1200], 2, 171],
+  ['DL', [1000,1200], 2, 171], ['AA', [800,1000], 1, 172], ['B6', [1000,1200], 2, 172],
+  ['DL', [1000,1200], 1, 172], ['EV', [800,1000], 1, 172], ['UA', [1000,1200], 2, 172],
+  ['9E', [1000,1200], 1, 173], ['B6', [1000,1200], 2, 173], ['DL', [1000,1200], 1, 174],
+  ['EV', [800,1000], 2, 174], ['UA', [1000,1200], 1, 174], ['B6', [1000,1200], 3, 175],
+  ['DL', [1000,1200], 1, 175], ['B6', [1000,1200], 1, 176], ['EV', [800,1000], 1, 176],
+  ['WN', [800,1000], 2, 176], ['B6', [1000,1200], 1, 177], ['EV', [800,1000], 2, 177],
+  ['DL', [1000,1200], 2, 178], ['EV', [800,1000], 2, 178], ['B6', [1000,1200], 1, 179],
+  ['EV', [800,1000], 1, 179], ['B6', [1400,1600], 1, 180], ['EV', [800,1000], 1, 180],
+  ['EV', [1000,1200], 2, 180], ['UA', [1000,1200], 1, 181], ['WN', [800,1000], 2, 181],
+  ['B6', [1400,1600], 1, 182], ['DL', [1400,1600], 1, 182], ['B6', [1400,1600], 2, 183],
+  ['DL', [1000,1200], 1, 183], ['EV', [800,1000], 1, 183], ['AA', [1600,1800], 1, 184],
+  ['B6', [1000,1200], 1, 184], ['B6', [1400,1600], 1, 184], ['B6', [1400,1600], 1, 185],
+  ['B6', [1400,1600], 2, 186], ['B6', [1400,1600], 2, 187], ['EV', [800,1000], 1, 187],
+  ['UA', [1000,1200], 1, 187], ['UA', [1600,1800], 1, 187], ['AA', [1400,1600], 2, 188],
+  ['B6', [1000,1200], 1, 188], ['DL', [1400,1600], 3, 188], ['UA', [1600,1800], 1, 188],
+  ['9E', [1000,1200], 1, 189], ['B6', [1400,1600], 3, 189], ['DL', [1000,1200], 1, 189],
+  ['UA', [1000,1200], 1, 189], ['UA', [1600,1800], 1, 189], ['AA', [1400,1600], 2, 190],
+  ['B6', [1400,1600], 4, 190], ['EV', [1000,1200], 2, 190], ['UA', [1400,1600], 1, 190],
+  ['UA', [1600,1800], 1, 190], ['AA', [1400,1600], 1, 191], ['B6', [1000,1200], 1, 191],
+  ['B6', [1400,1600], 5, 191], ['B6', [1600,1800], 1, 191], ['AA', [1400,1600], 1, 192],
+  ['B6', [1000,1200], 2, 192], ['DL', [1400,1600], 2, 192], ['EV', [1000,1200], 1, 192],
+  ['UA', [1400,1600], 1, 192], ['AA', [1600,1800], 1, 193], ['B6', [1400,1600], 3, 193],
+  ['DL', [1000,1200], 1, 193], ['B6', [1400,1600], 1, 194], ['EV', [800,1000], 1, 194],
+  ['UA', [1600,1800], 3, 194], ['B6', [1000,1200], 1, 195], ['B6', [1400,1600], 2, 195],
+  ['B6', [1600,1800], 2, 195], ['DL', [1000,1200], 1, 195], ['UA', [1600,1800], 1, 195],
+  ['B6', [1000,1200], 1, 196], ['DL', [1000,1200], 1, 196], ['DL', [1400,1600], 1, 196],
+  ['EV', [1000,1200], 1, 196], ['AA', [1400,1600], 1, 197], ['DL', [1000,1200], 1, 197],
+  ['B6', [1000,1200], 1, 198], ['EV', [1000,1200], 1, 198], ['UA', [1600,1800], 1, 199],
+  ['AA', [1400,1600], 1, 200], ['DL', [1000,1200], 1, 200], ['EV', [1000,1200], 2, 200],
+  ['9E', [1000,1200], 1, 202], ['AA', [1400,1600], 1, 202], ['EV', [1000,1200], 1, 203],
+  ['B6', [1000,1200], 1, 204], ['UA', [1400,1600], 1, 205], ['DL', [1000,1200], 1, 206],
+  ['9E', [1000,1200], 1, 207], ['EV', [1000,1200], 1, 208], ['UA', [1400,1600], 1, 208],
+  ['B6', [1600,1800], 1, 209], ['EV', [1000,1200], 1, 209], ['UA', [1400,1600], 1, 209],
+  ['UA', [1400,1600], 1, 210], ['AA', [1600,1800], 1, 211], ['EV', [1000,1200], 1, 211],
+  ['EV', [1000,1200], 1, 212], ['EV', [1000,1200], 1, 213], ['MQ', [1000,1200], 1, 213],
+  ['UA', [1400,1600], 1, 214], ['UA', [1400,1600], 1, 215], ['MQ', [1000,1200], 2, 216],
+  ['UA', [1600,1800], 1, 217], ['UA', [1400,1600], 1, 218], ['UA', [1600,1800], 1, 218],
+  ['F9', [1600,1800], 1, 219], ['UA', [1400,1600], 1, 219], ['UA', [1600,1800], 3, 219],
+  ['UA', [1400,1600], 1, 220], ['UA', [1600,1800], 1, 220], ['AA', [1200,1400], 1, 221],
+  ['UA', [1200,1400], 1, 221], ['UA', [1400,1600], 1, 221], ['DL', [1600,1800], 1, 222],
+  ['EV', [1000,1200], 1, 222], ['AA', [1200,1400], 2, 223], ['B6', [1600,1800], 1, 223],
+  ['UA', [1200,1400], 1, 223], ['UA', [1400,1600], 2, 223], ['AA', [1200,1400], 1, 225],
+  ['UA', [1400,1600], 1, 225], ['AA', [1200,1400], 2, 226], ['UA', [1400,1600], 2, 226],
+  ['UA', [1400,1600], 4, 227], ['AA', [1200,1400], 1, 228], ['UA', [1200,1400], 1, 228],
+  ['UA', [1600,1800], 1, 228], ['AA', [1200,1400], 2, 229], ['UA', [1400,1600], 3, 229],
+  ['AA', [1200,1400], 4, 230], ['UA', [1400,1600], 5, 230], ['UA', [1200,1400], 1, 231],
+  ['UA', [1400,1600], 2, 231], ['UA', [1400,1600], 2, 232], ['AA', [1200,1400], 2, 233],
+  ['MQ', [1000,1200], 2, 233], ['UA', [1200,1400], 1, 233], ['UA', [1400,1600], 1, 233],
+  ['UA', [1600,1800], 1, 233], ['WN', [1600,1800], 1, 233], ['EV', [1000,1200], 1, 234],
+  ['UA', [1400,1600], 1, 234], ['AA', [1200,1400], 1, 235], ['DL', [1600,1800], 1, 235],
+  ['UA', [1400,1600], 1, 235], ['WN', [1400,1600], 1, 235], ['AA', [1200,1400], 1, 236],
+  ['DL', [1600,1800], 1, 236], ['AA', [1200,1400], 1, 237], ['UA', [1400,1600], 2, 237],
+  ['UA', [1600,1800], 1, 237], ['AA', [1200,1400], 2, 238], ['DL', [1600,1800], 1, 238],
+  ['F9', [1600,1800], 1, 238], ['UA', [1400,1600], 5, 238], ['UA', [1600,1800], 1, 238],
+  ['F9', [1600,1800], 1, 239], ['UA', [1400,1600], 1, 239], ['WN', [1400,1600], 1, 239],
+  ['AA', [1200,1400], 1, 240], ['B6', [1600,1800], 1, 240], ['WN', [1400,1600], 1, 240],
+  ['AA', [1200,1400], 1, 241], ['B6', [1400,1600], 1, 241], ['UA', [1400,1600], 1, 241],
+  ['UA', [1600,1800], 1, 241], ['AA', [1200,1400], 1, 242], ['DL', [1600,1800], 1, 242],
+  ['F9', [1600,1800], 1, 242], ['UA', [1400,1600], 2, 242], ['UA', [1600,1800], 1, 242],
+  ['AA', [1200,1400], 3, 243], ['DL', [1400,1600], 1, 243], ['UA', [1200,1400], 1, 243],
+  ['UA', [1600,1800], 3, 243], ['WN', [1400,1600], 1, 243], ['WN', [1600,1800], 1, 243],
+  ['AA', [1200,1400], 1, 244], ['B6', [1400,1600], 1, 244], ['UA', [1600,1800], 1, 244],
+  ['AA', [1200,1400], 1, 245], ['B6', [1400,1600], 1, 245], ['WN', [1400,1600], 1, 245],
+  ['UA', [1400,1600], 1, 246], ['UA', [1600,1800], 3, 246], ['WN', [1400,1600], 1, 246],
+  ['WN', [1600,1800], 1, 246], ['AA', [1200,1400], 1, 247], ['AA', [1400,1600], 1, 247],
+  ['UA', [1600,1800], 2, 247], ['AA', [1200,1400], 5, 248], ['DL', [1600,1800], 1, 248],
+  ['UA', [1200,1400], 1, 248], ['UA', [1400,1600], 3, 248], ['AA', [1200,1400], 3, 249],
+  ['UA', [1200,1400], 1, 249], ['UA', [1400,1600], 1, 249], ['UA', [1600,1800], 1, 249],
+  ['EV', [1200,1400], 1, 250], ['UA', [1200,1400], 1, 250], ['AA', [1200,1400], 1, 251],
+  ['B6', [1400,1600], 1, 251], ['DL', [1400,1600], 2, 251], ['UA', [1600,1800], 1, 251],
+  ['AA', [1200,1400], 2, 252], ['AA', [1400,1600], 1, 252], ['UA', [1400,1600], 2, 252],
+  ['UA', [1600,1800], 1, 252], ['B6', [1400,1600], 1, 253], ['DL', [1600,1800], 1, 253],
+  ['AA', [1200,1400], 2, 254], ['UA', [1600,1800], 2, 254], ['WN', [1600,1800], 1, 254],
+  ['AA', [1200,1400], 1, 255], ['B6', [1400,1600], 1, 255], ['DL', [1800,2000], 1, 256],
+  ['UA', [1600,1800], 1, 256], ['AA', [1200,1400], 1, 257], ['F9', [1600,1800], 1, 257],
+  ['AA', [1200,1400], 1, 258], ['UA', [1800,2000], 1, 258], ['WN', [1600,1800], 1, 258],
+  ['B6', [1400,1600], 1, 259], ['UA', [1200,1400], 1, 259], ['AA', [1600,1800], 1, 260],
+  ['UA', [1400,1600], 1, 260], ['UA', [1600,1800], 1, 261], ['B6', [1400,1600], 1, 263],
+  ['WN', [1600,1800], 1, 263], ['DL', [1800,2000], 1, 264], ['UA', [1400,1600], 1, 264],
+  ['WN', [1600,1800], 2, 264], ['DL', [1600,1800], 1, 267], ['UA', [1600,1800], 1, 270],
+  ['B6', [1800,2000], 1, 272], ['DL', [1800,2000], 1, 272], ['DL', [1800,2000], 1, 274],
+  ['DL', [1800,2000], 1, 275], ['UA', [1800,2000], 1, 275], ['DL', [1800,2000], 2, 277],
+  ['WN', [1600,1800], 1, 279], ['AA', [1600,1800], 1, 280], ['DL', [1800,2000], 1, 281],
+  ['UA', [2200,2400], 1, 284], ['EV', [1200,1400], 1, 286], ['UA', [1600,1800], 1, 287],
+  ['UA', [2200,2400], 1, 289], ['B6', [2200,2400], 1, 290], ['B6', [1800,2000], 1, 291],
+  ['UA', [2000,2200], 1, 292], ['US', [2000,2200], 2, 292], ['DL', [2200,2400], 1, 293],
+  ['B6', [2200,2400], 1, 294], ['DL', [1800,2000], 1, 294], ['UA', [2200,2400], 1, 294],
+  ['DL', [1800,2000], 2, 295], ['B6', [2200,2400], 1, 297], ['DL', [1800,2000], 1, 298],
+  ['B6', [2000,2200], 1, 299], ['UA', [2000,2200], 1, 299], ['UA', [2200,2400], 1, 299],
+  ['US', [2000,2200], 1, 299], ['B6', [2200,2400], 1, 300], ['US', [2000,2200], 2, 303],
+  ['DL', [2200,2400], 1, 304], ['DL', [2400,2600], 1, 305], ['UA', [2400,2600], 1, 306],
+  ['B6', [2200,2400], 1, 307], ['UA', [2200,2400], 1, 307], ['UA', [2400,2600], 1, 307],
+  ['US', [2000,2200], 1, 308], ['VX', [2200,2400], 1, 308], ['B6', [2200,2400], 1, 309],
+  ['DL', [2200,2400], 2, 309], ['DL', [2400,2600], 1, 309], ['UA', [2000,2200], 1, 309],
+  ['US', [2000,2200], 1, 309], ['DL', [2200,2400], 1, 310], ['DL', [2400,2600], 1, 310],
+  ['UA', [2400,2600], 2, 310], ['UA', [2000,2200], 1, 311], ['DL', [2000,2200], 1, 312],
+  ['UA', [2400,2600], 1, 312], ['US', [2000,2200], 2, 312], ['AA', [2400,2600], 1, 313],
+  ['B6', [2400,2600], 1, 313], ['AS', [2400,2600], 1, 314], ['DL', [2000,2200], 1, 314],
+  ['UA', [2200,2400], 1, 314], ['B6', [2400,2600], 2, 316], ['UA', [2400,2600], 2, 316],
+  ['VX', [2400,2600], 1, 316], ['B6', [2400,2600], 1, 317], ['DL', [2400,2600], 1, 317],
+  ['US', [2000,2200], 1, 317], ['US', [2000,2200], 1, 318], ['DL', [2400,2600], 2, 319],
+  ['UA', [2400,2600], 1, 319], ['B6', [2400,2600], 1, 320], ['DL', [1800,2000], 1, 320],
+  ['DL', [2200,2400], 2, 320], ['UA', [2000,2200], 1, 320], ['B6', [2400,2600], 2, 321],
+  ['UA', [2400,2600], 2, 321], ['AA', [2200,2400], 1, 322], ['DL', [2400,2600], 1, 322],
+  ['UA', [2400,2600], 1, 322], ['VX', [2400,2600], 1, 322], ['AA', [2400,2600], 1, 323],
+  ['B6', [2000,2200], 1, 323], ['B6', [2200,2400], 1, 323], ['B6', [2400,2600], 3, 323],
+  ['DL', [2200,2400], 1, 323], ['DL', [2400,2600], 2, 323], ['UA', [2400,2600], 3, 324],
+  ['US', [2000,2200], 1, 324], ['VX', [2200,2400], 1, 324], ['AS', [2400,2600], 1, 325],
+  ['B6', [2400,2600], 1, 325], ['DL', [2400,2600], 1, 325], ['UA', [2200,2400], 1, 325],
+  ['UA', [2400,2600], 2, 325], ['B6', [2400,2600], 1, 326], ['UA', [2400,2600], 1, 326],
+  ['WN', [2000,2200], 1, 326], ['B6', [2400,2600], 2, 327], ['DL', [2400,2600], 1, 327],
+  ['B6', [2400,2600], 3, 328], ['UA', [2000,2200], 1, 328], ['UA', [2400,2600], 1, 328],
+  ['UA', [2400,2600], 1, 329], ['B6', [2400,2600], 3, 330], ['DL', [2400,2600], 1, 330],
+  ['UA', [2400,2600], 1, 330], ['US', [2000,2200], 1, 330], ['VX', [2400,2600], 2, 330],
+  ['WN', [2000,2200], 1, 330], ['AA', [2200,2400], 1, 331], ['B6', [2400,2600], 1, 331],
+  ['DL', [2400,2600], 1, 331], ['UA', [2400,2600], 1, 331], ['WN', [2000,2200], 1, 331],
+  ['AA', [2400,2600], 1, 332], ['AS', [2400,2600], 1, 332], ['DL', [2400,2600], 2, 332],
+  ['UA', [2400,2600], 2, 332], ['AA', [2400,2600], 1, 333], ['B6', [2400,2600], 2, 333],
+  ['DL', [2400,2600], 2, 333], ['UA', [2400,2600], 2, 333], ['US', [2000,2200], 1, 333],
+  ['VX', [2400,2600], 1, 333], ['B6', [2400,2600], 2, 334], ['DL', [2400,2600], 1, 334],
+  ['UA', [2400,2600], 3, 334], ['WN', [2000,2200], 1, 334], ['AA', [2400,2600], 1, 335],
+  ['B6', [2400,2600], 1, 335], ['UA', [2400,2600], 1, 335], ['VX', [2400,2600], 1, 335],
+  ['AA', [2400,2600], 3, 336], ['AS', [2400,2600], 1, 336], ['DL', [2200,2400], 2, 336],
+  ['UA', [2400,2600], 2, 336], ['AA', [2400,2600], 1, 337], ['B6', [2400,2600], 3, 337],
+  ['UA', [2200,2400], 1, 337], ['UA', [2400,2600], 2, 337], ['AA', [2400,2600], 1, 338],
+  ['AS', [2400,2600], 1, 338], ['UA', [2400,2600], 1, 338], ['VX', [2400,2600], 2, 338],
+  ['B6', [2400,2600], 1, 339], ['DL', [2400,2600], 1, 339], ['UA', [2000,2200], 1, 339],
+  ['UA', [2400,2600], 1, 339], ['AA', [2400,2600], 1, 340], ['DL', [2400,2600], 1, 340],
+  ['UA', [2000,2200], 1, 340], ['UA', [2400,2600], 4, 340], ['AA', [2400,2600], 1, 341],
+  ['DL', [2400,2600], 3, 341], ['UA', [2400,2600], 7, 341], ['VX', [2400,2600], 1, 341],
+  ['DL', [2400,2600], 1, 342], ['UA', [2200,2400], 1, 342], ['UA', [2400,2600], 2, 342],
+  ['US', [2000,2200], 2, 342], ['DL', [2400,2600], 1, 343], ['UA', [2400,2600], 2, 343],
+  ['AA', [2400,2600], 3, 344], ['UA', [2400,2600], 2, 344], ['VX', [2400,2600], 1, 344],
+  ['UA', [2400,2600], 4, 345], ['AA', [2400,2600], 1, 346], ['B6', [2400,2600], 1, 346],
+  ['UA', [2400,2600], 4, 346], ['VX', [2400,2600], 1, 346], ['DL', [2400,2600], 1, 347],
+  ['UA', [2400,2600], 1, 347], ['VX', [2400,2600], 1, 347], ['AA', [2400,2600], 2, 348],
+  ['DL', [2400,2600], 1, 348], ['UA', [2400,2600], 2, 348], ['AA', [2400,2600], 1, 349],
+  ['B6', [2400,2600], 3, 349], ['DL', [2400,2600], 1, 349], ['UA', [2400,2600], 1, 349],
+  ['VX', [2400,2600], 1, 349], ['B6', [2400,2600], 1, 350], ['UA', [2400,2600], 3, 350],
+  ['AA', [2400,2600], 2, 351], ['UA', [2400,2600], 2, 351], ['B6', [2400,2600], 2, 352],
+  ['VX', [2400,2600], 1, 352], ['AA', [2400,2600], 2, 353], ['VX', [2400,2600], 2, 353],
+  ['AA', [2400,2600], 1, 354], ['B6', [2400,2600], 1, 354], ['UA', [2400,2600], 2, 354],
+  ['VX', [2400,2600], 1, 354], ['UA', [2400,2600], 1, 355], ['AA', [2400,2600], 1, 356],
+  ['UA', [2400,2600], 2, 356], ['VX', [2400,2600], 1, 356], ['AA', [2400,2600], 1, 357],
+  ['DL', [2400,2600], 1, 357], ['UA', [2400,2600], 3, 357], ['VX', [2400,2600], 1, 357],
+  ['AA', [2400,2600], 2, 358], ['UA', [2400,2600], 1, 359], ['VX', [2400,2600], 1, 359],
+  ['AA', [2400,2600], 1, 360], ['UA', [2400,2600], 2, 360], ['AA', [2400,2600], 1, 361],
+  ['DL', [2400,2600], 1, 361], ['UA', [2400,2600], 1, 361], ['VX', [2400,2600], 2, 361],
+  ['AA', [2400,2600], 1, 362], ['DL', [2400,2600], 2, 362], ['UA', [2400,2600], 1, 362],
+  ['VX', [2400,2600], 1, 362], ['DL', [2400,2600], 1, 363], ['VX', [2400,2600], 1, 363],
+  ['UA', [2400,2600], 1, 364], ['VX', [2400,2600], 1, 364], ['AA', [2400,2600], 1, 366],
+  ['UA', [2400,2600], 2, 366], ['DL', [2400,2600], 1, 367], ['UA', [2400,2600], 1, 367],
+  ['UA', [2400,2600], 1, 369], ['B6', [2400,2600], 1, 370], ['B6', [2400,2600], 1, 371],
+  ['DL', [2400,2600], 1, 371], ['UA', [2400,2600], 1, 371], ['UA', [2400,2600], 1, 373],
+  ['DL', [2400,2600], 1, 375], ['AA', [2400,2600], 1, 378], ['UA', [2400,2600], 1, 380],
+  ['B6', [2400,2600], 1, 381], ['DL', [2400,2600], 1, 381], ['AA', [2400,2600], 1, 389],
+  ['UA', [4800,5000], 1, 634], ['HA', [4800,5000], 1, 638], ['UA', [4800,5000], 1, 656],
+  ['HA', [4800,5000], 1, 659], ['9E', [600,800], 1, null], ['9E', [1200,1400], 2, null],
+  ['9E', [1400,1600], 1, null], ['AA', [1000,1200], 1, null], ['AA', [1200,1400], 2, null],
+  ['AA', [2400,2600], 1, null], ['B6', [1000,1200], 2, null], ['EV', [200,400], 2, null],
+  ['EV', [400,600], 2, null], ['EV', [600,800], 2, null], ['EV', [800,1000], 1, null],
+  ['EV', [1000,1200], 2, null], ['EV', [1200,1400], 2, null], ['MQ', [1000,1200], 2, null],
+  ['UA', [600,800], 1, null], ['UA', [1000,1200], 1, null], ['UA', [2400,2600], 1, null]]
+};
+
+// Call Code to Build the system ///////////////////////////////////////////////////////////////////
+
+var v  = new BrunelVis('visualization');
+v.build(table1);
+
+</script>
+</body>
+</html>

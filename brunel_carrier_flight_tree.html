@@ -1,0 +1,520 @@
+<html>
+<head>
+<title></title>
+<link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/modelViewerChart.css"/>
+<link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/light/looks.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.1/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
+<script src="http://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
+<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
+<script src="https://brunelvis.org/js/brunel.2.4.min.js"</script>
+<script src="https://brunelvis.org/js/brunel.controls.2.4.min.js"</script>
+<style>
+</style>
+</head>
+<body>
+<svg id="visualization" width="600" height="600"></svg>
+<script>
+function  BrunelVis(visId) {
+  "use strict";                                                                       // strict mode
+  var datasets = [],                                      // array of datasets for the original data
+      pre = function(d, i) { return d },                         // default pre-process does nothing
+      post = function(d, i) { return d },                       // default post-process does nothing
+      transitionTime = 200,                                        // transition time for animations
+      charts = [],                                                       // the charts in the system
+      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
+
+  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
+
+  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
+
+  charts[0] = function(parentNode, filterRows) {
+    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 0, 0, 0, 0),
+      elements = [];                                              // array of elements in this chart
+
+    // Define groups for the chart parts ///////////////////////////////////////////////////////////
+
+    var chart =  vis.append('g').attr('class', 'chart1')
+      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
+    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
+    var zoom = d3.zoom().scaleExtent([1/2,10]);
+    var zoomNode = overlay.append('rect').attr('class', 'overlay')
+      .attr('x', geom.inner_left).attr('y', geom.inner_top)
+      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
+      .style('cursor', 'move').call(zoom)
+      .node();
+    zoomNode.__zoom = d3.zoomIdentity;
+    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
+    var interior = chart.append('g').attr('class', 'interior zoomNone')
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
+      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
+    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
+    var gridGroup = interior.append('g').attr('class', 'grid');
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
+      .attr('x', 0).attr('y', 0)
+      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
+    var tree, expandState = [], collapseState = {};    // collapse state maps node IDs to true/false
+    var graph;                                                                // the tree with links
+    var scale_x = d3.scaleLinear(), scale_y = d3.scaleLinear();
+    var base_scales = [scale_x, scale_y];                           // untransformed original scales
+    zoom.on('zoom', function(t, time) {
+        t = t || d3.event.transform;
+        scale_x = t.rescaleX(base_scales[0]);
+        scale_y = t.rescaleY(base_scales[1]);
+        zoomNode.__zoom = t;
+        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
+        build(time || -1);
+    });
+
+    // Define element #1 ///////////////////////////////////////////////////////////////////////////
+
+    elements[0] = function() {
+      var original, processed,                           // data sets passed in and then transformed
+        element, data,                                 // brunel element information and brunel data
+        selection, merged;                                      // d3 selection and merged selection
+      var elementGroup = interior.append('g').attr('class', 'element1'),
+        main = elementGroup.append('g').attr('class', 'main'),
+        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup),
+        diagramExtras = elementGroup.append('g').attr('class', 'extras'),
+        diagramLabels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'diagram labels').attr('aria-hidden', 'true'), elementGroup);
+
+      function makeData() {
+        original = datasets[0];
+        if (filterRows) original = original.retainRows(filterRows);
+        processed = pre(original, 0)
+          .summarize('#count=#count:sum; carrier=carrier:base; flight=flight');
+        processed = post(processed, 0);
+        var f0 = processed.field('carrier'),
+          f1 = processed.field('#count'),
+          f2 = processed.field('flight'),
+          f3 = processed.field('#row'),
+          f4 = processed.field('#selection');
+        var keyFunc = function(d) { return f3.value(d) };
+        data = {
+          carrier:      function(d) { return f0.value(d.row) },
+          $count:       function(d) { return f1.value(d.row) },
+          flight:       function(d) { return f2.value(d.row) },
+          $row:         function(d) { return f3.value(d.row) },
+          $selection:   function(d) { return f4.value(d.row) },
+          carrier_f:    function(d) { return f0.valueFormatted(d.row) },
+          $count_f:     function(d) { return f1.valueFormatted(d.row) },
+          flight_f:     function(d) { return f2.valueFormatted(d.row) },
+          $row_f:       function(d) { return f3.valueFormatted(d.row) },
+          $selection_f: function(d) { return f4.valueFormatted(d.row) },
+          _split:       function(d) { return f1.value(d.row) },
+          _key:         keyFunc,
+          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
+        };
+      }
+      // Aesthetic Functions
+      var scale_size = d3.scaleSqrt().domain([0, 3.0000003])
+        .range([ 0.001, 1]);
+      var size = function(d) { return scale_size(d.value) };
+
+      // Build element from data ///////////////////////////////////////////////////////////////////
+
+      function build(transitionMillis) {
+        element = elements[0];
+        // Define tree (hierarchy) data structures
+        var first = (!tree);
+        graph = BrunelData.diagram_Hierarchical.makeByNestingFields(processed, null, '#count', 'carrier');
+        var targetNode = graph.root;
+        tree = d3.hierarchy(targetNode).sum(function(d) { return d.value });
+        BrunelD3.prune(tree, collapseState, false);
+        function nodeKey(d) { return d.data.key == null ? data._key(d.data.row) : d.data.key };
+        var treeLayout = d3.tree()
+          .size([geom.inner_height-40, geom.inner_width-76]);
+        var treeNodes = treeLayout(tree).descendants();
+        BrunelD3.copyTreeLayoutInfo(treeNodes, graph, 20);
+        main.attr('class', 'diagram tree hierarchy');
+        // Define Coordinate functions
+        function r(d) { return d.data.radius = size(d) * geom.default_point_size / 2 };
+        function x(d) { return scale_x(d.y) };
+        function y(d) { return scale_y(d.x) };
+        var labeling  = [{
+          index: 0, method: 'box', location: ['right', 'center'], inside: false, align: 'start', pad: 3, dy: 0.3,
+          fit: false, granularity: 8,
+          content: function(d) {
+            return d.row == null ? null : data.flight_f(d)
+          }
+        }];
+
+        // Define selection entry operations
+        function initialState(selection) {
+          selection
+            .attr('class', 'element point filled')
+        }
+
+        // Define selection update operations on merged data
+        function updateState(selection) {
+          selection
+            .attr('class', function(d) { return (d.collapsed ? 'collapsed ' : '') + (d.data.children ? 'element L' + d.depth : 'leaf element point') })
+            .attr('cx',function(d) { return x(d)})
+            .attr('cy',function(d) { return y(d)})
+            .attr('r',function(d) { return r(d) * 2 / 2})
+
+          // Add in the arcs on the outside for the groups
+          diagramExtras.attr('class', 'diagram tree edge');
+          function edgeKey(d) { return nodeKey(d.source) + '%' + nodeKey(d.target) };
+          var edgeGroup = diagramExtras.selectAll('path').data(tree.links(), edgeKey);
+          var added = edgeGroup.enter().append('path').attr('class', 'edge')
+            .attr('d', function(d) {
+              var p = BrunelD3.insetEdge(scale_x(d.source.y), scale_y(d.source.x), d.source,
+                scale_x(d.target.y), scale_y(d.target.x), d.target);
+              return 'M' + p.x1 + ',' + p.y1 + 
+                'C' + (p.x1+p.x2)/2 + ',' + p.y1
+                 + ' ' + (p.x1+p.x2)/2 + ',' + p.y2 + ' ' 
+                + p.x2 + ',' + p.y2;
+          });
+          BrunelD3.transition(edgeGroup.merge(added), transitionMillis)
+            .attr('d', function(d) {
+              var p = BrunelD3.insetEdge(scale_x(d.source.y), scale_y(d.source.x), d.source,
+                scale_x(d.target.y), scale_y(d.target.x), d.target);
+              return 'M' + p.x1 + ',' + p.y1 + 
+                'C' + (p.x1+p.x2)/2 + ',' + p.y1
+                 + ' ' + (p.x1+p.x2)/2 + ',' + p.y2 + ' ' 
+                + p.x2 + ',' + p.y2;
+          });
+
+          BrunelD3.transition(edgeGroup.exit(), transitionMillis/3)
+            .style('opacity', 0.5).each( function() {
+              this.remove(); BrunelD3.removeLabels(this); 
+          });
+          diagramLabels.attr('class', 'axis diagram tree hierarchy');
+          var treeLabeling = [{ location:['center', 'bottom'], fit:false, dy:0.75, align:'middle', granularity:1, 
+            content:  function(d) { return d.data.innerNodeName },
+            cssClass: function(d) { return 'axis label L' + d.depth + ' H' + d.height } 
+          }];
+          BrunelD3.label(selection.filter(function(d) {return d.data.innerNodeName}), diagramLabels, transitionMillis, geom, treeLabeling);
+          ;
+          ;
+        }
+
+        // Define labeling for the selection
+        function label(selection, transitionMillis) {
+          BrunelD3.label(selection, labels, transitionMillis, geom, labeling);
+
+          var tooltipLabeling  = {
+            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
+            fit: true, granularity: 0,
+            content: function(d) {
+              return d.row == null ? null : '<span class="title">carrier: </span>'
+			+ '<span class="field">' + data.carrier_f(d) + '</span>'
+			+ '<br/>'
+			+ '<span class="title">Count: </span>'
+			+ '<span class="field">' + data.$count_f(d) + '</span>'
+			+ '<br/>'
+			+ '<span class="title">flight: </span>'
+			+ '<span class="field">' + data.flight_f(d) + '</span>'
+            }
+          };
+          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
+        }
+        // Create selections, set the initial state and transition updates
+        selection = main.selectAll('.element').data(treeNodes, nodeKey);
+        var added = selection.enter().append('circle');
+        merged = selection.merge(added);
+        initialState(added);
+        selection.filter(BrunelD3.hasData)
+          .classed('selected', BrunelD3.isSelected(data))
+          .filter(BrunelD3.isSelected(data)).raise();
+        updateState(BrunelD3.transition(merged, transitionMillis));
+        label(merged, transitionMillis);
+
+        BrunelD3.transition(selection.exit(), transitionMillis/3)
+          .style('opacity', 0.5).each( function() {
+            this.remove(); BrunelD3.removeLabels(this); 
+        });
+        merged                                                     // attach handlers to the element
+          .on('dblclick.collapse', function(d) {if (d.data.children) {collapseState[d.data.key] = !collapseState[d.data.key]; charts[0].build(500)}  });
+      }
+
+      return {
+        data:           function() { return processed },
+        original:       function() { return original },
+        internal:       function() { return data },
+        selection:      function() { return merged },
+        makeData:       makeData,
+        build:          build,
+        chart:          function() { return charts[0] },
+        group:          function() { return elementGroup },
+        fields: {
+          x:            ['carrier'],
+          key:          ['#row'],
+          size:         ['#count']
+        }
+      };
+    }();
+
+    function build(time, noData) {
+      var first = elements[0].data() == null;
+      if (first) time = 0;                                           // no transition for first call
+      if ((first || time > -1) && !noData) {
+        elements[0].makeData();
+      }
+      elements[0].build(time);
+    }
+
+    // Expose the following components of the chart
+    return {
+      elements : elements,
+      interior : interior,
+      zoom: function(params, time) {
+          if (params) zoom.on('zoom').call(zoomNode, params, time);
+          return d3.zoomTransform(zoomNode);
+      },
+      build : build
+    };
+    }();
+
+  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
+  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
+  function buildAll() {
+    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
+    updateAll(transitionTime);
+  }
+
+  return {
+    dataPreProcess:     function(f) { if (f) pre = f; return pre },
+    dataPostProcess:    function(f) { if (f) post = f; return post },
+    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
+    visId:              visId,
+    build:              buildAll,
+    rebuild:            updateAll,
+    charts:             charts
+  }
+}
+
+// Data Tables /////////////////////////////////////////////////////////////////////////////////////
+
+var table1 = {
+   summarized: true,
+   names: ['carrier', '#count', 'flight'], 
+   options: ['string', 'numeric', 'numeric'], 
+   rows: [['9E', 1, 3286], ['9E', 2, 3295], ['9E', 2, 3320], ['9E', 2, 3321], ['9E', 1, 3323],
+  ['9E', 2, 3325], ['9E', 2, 3331], ['9E', 2, 3338], ['9E', 2, 3347], ['9E', 2, 3352],
+  ['9E', 1, 3353], ['9E', 2, 3357], ['9E', 2, 3359], ['9E', 2, 3361], ['9E', 2, 3364],
+  ['9E', 2, 3369], ['9E', 2, 3372], ['9E', 1, 3373], ['9E', 1, 3383], ['9E', 1, 3384],
+  ['9E', 1, 3392], ['9E', 1, 3401], ['9E', 1, 3405], ['9E', 2, 3409], ['9E', 1, 3420],
+  ['9E', 1, 3422], ['9E', 2, 3459], ['9E', 2, 3521], ['9E', 3, 3538], ['9E', 1, 3611],
+  ['9E', 1, 3643], ['9E', 1, 3651], ['9E', 1, 3653], ['9E', 1, 3658], ['9E', 2, 3664],
+  ['9E', 1, 3694], ['9E', 1, 3754], ['9E', 2, 3792], ['9E', 1, 3793], ['9E', 1, 3798],
+  ['9E', 1, 3799], ['9E', 2, 3830], ['9E', 2, 3843], ['9E', 2, 3899], ['9E', 1, 3903],
+  ['9E', 1, 3925], ['9E', 1, 3983], ['9E', 1, 4023], ['9E', 1, 4033], ['9E', 1, 4051],
+  ['9E', 2, 4088], ['9E', 2, 4091], ['9E', 2, 4105], ['9E', 1, 4108], ['9E', 1, 4171],
+  ['9E', 2, 4220], ['9E', 1, 4261], ['AA', 3, 1], ['AA', 2, 3], ['AA', 2, 19], ['AA', 2, 21],
+  ['AA', 3, 33], ['AA', 3, 59], ['AA', 2, 85], ['AA', 2, 117], ['AA', 2, 119], ['AA', 2, 133],
+  ['AA', 2, 145], ['AA', 2, 177], ['AA', 2, 179], ['AA', 2, 181], ['AA', 2, 185], ['AA', 2, 257],
+  ['AA', 2, 269], ['AA', 3, 301], ['AA', 3, 303], ['AA', 2, 305], ['AA', 2, 309], ['AA', 2, 313],
+  ['AA', 2, 319], ['AA', 2, 321], ['AA', 2, 327], ['AA', 2, 329], ['AA', 2, 337], ['AA', 2, 341],
+  ['AA', 2, 345], ['AA', 2, 353], ['AA', 2, 359], ['AA', 2, 371], ['AA', 3, 413], ['AA', 3, 443],
+  ['AA', 2, 543], ['AA', 2, 565], ['AA', 2, 575], ['AA', 3, 647], ['AA', 3, 655], ['AA', 2, 695],
+  ['AA', 3, 707], ['AA', 3, 711], ['AA', 2, 715], ['AA', 2, 717], ['AA', 2, 721], ['AA', 2, 731],
+  ['AA', 2, 739], ['AA', 2, 743], ['AA', 2, 745], ['AA', 2, 753], ['AA', 2, 759], ['AA', 2, 763],
+  ['AA', 2, 773], ['AA', 2, 785], ['AA', 2, 791], ['AA', 3, 825], ['AA', 2, 883], ['AA', 2, 1039],
+  ['AA', 2, 1073], ['AA', 3, 1141], ['AA', 2, 1351], ['AA', 2, 1357], ['AA', 2, 1467],
+  ['AA', 2, 1589], ['AA', 2, 1611], ['AA', 2, 1613], ['AA', 2, 1623], ['AA', 2, 1635],
+  ['AA', 2, 1709], ['AA', 2, 1757], ['AA', 2, 1762], ['AA', 2, 1769], ['AA', 2, 1787],
+  ['AA', 2, 1790], ['AA', 2, 1813], ['AA', 3, 1815], ['AA', 3, 1837], ['AA', 3, 1838],
+  ['AA', 2, 1850], ['AA', 2, 1853], ['AA', 2, 1855], ['AA', 3, 1895], ['AA', 2, 1905],
+  ['AA', 2, 1925], ['AA', 2, 1999], ['AA', 2, 2019], ['AA', 2, 2041], ['AA', 2, 2075],
+  ['AA', 3, 2083], ['AA', 2, 2099], ['AA', 2, 2223], ['AA', 2, 2253], ['AA', 2, 2267],
+  ['AA', 3, 2279], ['AS', 2, 7], ['AS', 3, 11], ['B6', 2, 1], ['B6', 3, 3], ['B6', 2, 4],
+  ['B6', 2, 8], ['B6', 2, 9], ['B6', 2, 11], ['B6', 2, 12], ['B6', 2, 15], ['B6', 2, 17],
+  ['B6', 3, 20], ['B6', 2, 21], ['B6', 2, 22], ['B6', 2, 24], ['B6', 2, 27], ['B6', 2, 30],
+  ['B6', 2, 31], ['B6', 2, 32], ['B6', 2, 35], ['B6', 2, 39], ['B6', 2, 41], ['B6', 2, 43],
+  ['B6', 3, 44], ['B6', 2, 47], ['B6', 3, 49], ['B6', 2, 56], ['B6', 2, 57], ['B6', 3, 59],
+  ['B6', 2, 61], ['B6', 2, 63], ['B6', 2, 66], ['B6', 3, 71], ['B6', 1, 74], ['B6', 3, 79],
+  ['B6', 2, 83], ['B6', 2, 85], ['B6', 2, 87], ['B6', 2, 91], ['B6', 2, 97], ['B6', 3, 102],
+  ['B6', 3, 104], ['B6', 2, 112], ['B6', 2, 115], ['B6', 3, 117], ['B6', 2, 119], ['B6', 3, 125],
+  ['B6', 2, 128], ['B6', 2, 130], ['B6', 2, 133], ['B6', 3, 135], ['B6', 2, 137], ['B6', 2, 139],
+  ['B6', 2, 141], ['B6', 2, 143], ['B6', 2, 147], ['B6', 2, 153], ['B6', 2, 155], ['B6', 2, 157],
+  ['B6', 2, 163], ['B6', 2, 165], ['B6', 2, 171], ['B6', 2, 173], ['B6', 2, 179], ['B6', 3, 181],
+  ['B6', 2, 185], ['B6', 2, 199], ['B6', 3, 203], ['B6', 2, 209], ['B6', 2, 215], ['B6', 2, 217],
+  ['B6', 2, 219], ['B6', 2, 227], ['B6', 3, 341], ['B6', 3, 343], ['B6', 2, 347], ['B6', 2, 355],
+  ['B6', 2, 359], ['B6', 2, 361], ['B6', 2, 369], ['B6', 3, 371], ['B6', 2, 373], ['B6', 2, 375],
+  ['B6', 2, 377], ['B6', 2, 381], ['B6', 2, 383], ['B6', 3, 389], ['B6', 2, 391], ['B6', 2, 393],
+  ['B6', 2, 399], ['B6', 2, 431], ['B6', 2, 503], ['B6', 2, 505], ['B6', 3, 507], ['B6', 2, 509],
+  ['B6', 2, 515], ['B6', 3, 517], ['B6', 2, 523], ['B6', 2, 525], ['B6', 2, 527], ['B6', 2, 529],
+  ['B6', 2, 537], ['B6', 2, 545], ['B6', 2, 547], ['B6', 3, 553], ['B6', 2, 600], ['B6', 2, 602],
+  ['B6', 2, 608], ['B6', 3, 611], ['B6', 2, 615], ['B6', 2, 619], ['B6', 2, 625], ['B6', 2, 629],
+  ['B6', 2, 641], ['B6', 3, 643], ['B6', 2, 645], ['B6', 3, 671], ['B6', 2, 673], ['B6', 2, 675],
+  ['B6', 2, 677], ['B6', 2, 679], ['B6', 2, 699], ['B6', 2, 701], ['B6', 2, 703], ['B6', 2, 705],
+  ['B6', 3, 707], ['B6', 3, 709], ['B6', 2, 711], ['B6', 2, 713], ['B6', 3, 715], ['B6', 3, 717],
+  ['B6', 3, 725], ['B6', 3, 727], ['B6', 2, 739], ['B6', 3, 905], ['B6', 2, 917], ['B6', 3, 981],
+  ['B6', 3, 983], ['B6', 2, 985], ['B6', 3, 987], ['B6', 2, 989], ['B6', 2, 991], ['B6', 3, 1002],
+  ['B6', 2, 1004], ['B6', 2, 1006], ['B6', 2, 1010], ['B6', 2, 1016], ['B6', 1, 1018],
+  ['B6', 1, 1020], ['B6', 1, 1026], ['B6', 3, 1051], ['B6', 2, 1053], ['B6', 2, 1061],
+  ['B6', 2, 1069], ['B6', 2, 1085], ['B6', 2, 1103], ['B6', 2, 1109], ['B6', 2, 1111],
+  ['B6', 2, 1161], ['B6', 3, 1172], ['B6', 2, 1174], ['B6', 2, 1176], ['B6', 2, 1305],
+  ['B6', 2, 1307], ['B6', 3, 1601], ['B6', 2, 1783], ['B6', 1, 1806], ['DL', 2, 4], ['DL', 2, 6],
+  ['DL', 1, 27], ['DL', 2, 31], ['DL', 2, 87], ['DL', 2, 91], ['DL', 2, 95], ['DL', 3, 120],
+  ['DL', 1, 161], ['DL', 2, 181], ['DL', 3, 269], ['DL', 3, 301], ['DL', 2, 315], ['DL', 2, 329],
+  ['DL', 1, 401], ['DL', 1, 452], ['DL', 3, 461], ['DL', 3, 485], ['DL', 2, 495], ['DL', 2, 503],
+  ['DL', 2, 507], ['DL', 2, 513], ['DL', 2, 541], ['DL', 1, 544], ['DL', 3, 575], ['DL', 2, 667],
+  ['DL', 1, 673], ['DL', 1, 695], ['DL', 2, 702], ['DL', 2, 706], ['DL', 2, 731], ['DL', 2, 763],
+  ['DL', 2, 781], ['DL', 2, 807], ['DL', 3, 831], ['DL', 2, 847], ['DL', 2, 853], ['DL', 1, 857],
+  ['DL', 2, 863], ['DL', 2, 869], ['DL', 1, 884], ['DL', 2, 904], ['DL', 3, 914], ['DL', 2, 920],
+  ['DL', 2, 924], ['DL', 1, 926], ['DL', 1, 942], ['DL', 2, 947], ['DL', 2, 951], ['DL', 1, 981],
+  ['DL', 1, 995], ['DL', 1, 1006], ['DL', 2, 1031], ['DL', 1, 1043], ['DL', 2, 1047],
+  ['DL', 2, 1109], ['DL', 2, 1131], ['DL', 1, 1139], ['DL', 1, 1147], ['DL', 2, 1167],
+  ['DL', 2, 1171], ['DL', 1, 1181], ['DL', 2, 1185], ['DL', 2, 1231], ['DL', 1, 1247],
+  ['DL', 2, 1271], ['DL', 2, 1275], ['DL', 2, 1283], ['DL', 3, 1318], ['DL', 2, 1322],
+  ['DL', 2, 1335], ['DL', 2, 1339], ['DL', 2, 1383], ['DL', 1, 1407], ['DL', 2, 1411],
+  ['DL', 3, 1415], ['DL', 2, 1429], ['DL', 1, 1433], ['DL', 1, 1435], ['DL', 2, 1443],
+  ['DL', 1, 1445], ['DL', 1, 1447], ['DL', 2, 1456], ['DL', 2, 1467], ['DL', 1, 1473],
+  ['DL', 2, 1485], ['DL', 1, 1499], ['DL', 2, 1508], ['DL', 2, 1529], ['DL', 2, 1531],
+  ['DL', 3, 1547], ['DL', 1, 1573], ['DL', 2, 1585], ['DL', 2, 1619], ['DL', 1, 1627],
+  ['DL', 2, 1629], ['DL', 2, 1643], ['DL', 2, 1647], ['DL', 1, 1668], ['DL', 1, 1685],
+  ['DL', 1, 1705], ['DL', 2, 1715], ['DL', 2, 1743], ['DL', 3, 1747], ['DL', 1, 1765],
+  ['DL', 2, 1773], ['DL', 1, 1779], ['DL', 1, 1785], ['DL', 1, 1807], ['DL', 2, 1819],
+  ['DL', 2, 1843], ['DL', 2, 1847], ['DL', 1, 1854], ['DL', 2, 1861], ['DL', 3, 1865],
+  ['DL', 1, 1869], ['DL', 3, 1879], ['DL', 3, 1885], ['DL', 1, 1889], ['DL', 2, 1903],
+  ['DL', 3, 1919], ['DL', 2, 1935], ['DL', 2, 1939], ['DL', 2, 1942], ['DL', 2, 1947],
+  ['DL', 3, 1959], ['DL', 2, 1967], ['DL', 2, 1972], ['DL', 2, 1997], ['DL', 3, 2003],
+  ['DL', 1, 2006], ['DL', 1, 2019], ['DL', 2, 2043], ['DL', 3, 2047], ['DL', 1, 2057],
+  ['DL', 2, 2068], ['DL', 2, 2071], ['DL', 1, 2079], ['DL', 3, 2119], ['DL', 1, 2121],
+  ['DL', 1, 2131], ['DL', 2, 2137], ['DL', 2, 2139], ['DL', 3, 2143], ['DL', 2, 2159],
+  ['DL', 2, 2174], ['DL', 2, 2175], ['DL', 2, 2185], ['DL', 2, 2219], ['DL', 1, 2231],
+  ['DL', 2, 2247], ['DL', 2, 2263], ['DL', 1, 2285], ['DL', 1, 2304], ['DL', 2, 2319],
+  ['DL', 2, 2331], ['DL', 1, 2343], ['DL', 2, 2347], ['DL', 1, 2363], ['DL', 1, 2370],
+  ['DL', 2, 2379], ['DL', 2, 2391], ['DL', 3, 2395], ['EV', 2, 3260], ['EV', 1, 3267],
+  ['EV', 2, 3272], ['EV', 1, 3274], ['EV', 2, 3806], ['EV', 2, 3807], ['EV', 1, 3815],
+  ['EV', 1, 3829], ['EV', 1, 3831], ['EV', 2, 3832], ['EV', 1, 3835], ['EV', 1, 3839],
+  ['EV', 2, 3843], ['EV', 1, 3845], ['EV', 3, 3849], ['EV', 2, 3850], ['EV', 2, 4085],
+  ['EV', 2, 4088], ['EV', 1, 4090], ['EV', 2, 4092], ['EV', 1, 4093], ['EV', 1, 4103],
+  ['EV', 2, 4104], ['EV', 2, 4106], ['EV', 1, 4112], ['EV', 2, 4118], ['EV', 2, 4119],
+  ['EV', 1, 4122], ['EV', 3, 4125], ['EV', 2, 4129], ['EV', 2, 4131], ['EV', 2, 4133],
+  ['EV', 2, 4135], ['EV', 1, 4138], ['EV', 1, 4140], ['EV', 2, 4144], ['EV', 1, 4147],
+  ['EV', 1, 4150], ['EV', 1, 4151], ['EV', 1, 4153], ['EV', 1, 4159], ['EV', 1, 4160],
+  ['EV', 1, 4164], ['EV', 1, 4166], ['EV', 2, 4170], ['EV', 1, 4171], ['EV', 2, 4175],
+  ['EV', 1, 4179], ['EV', 2, 4180], ['EV', 2, 4181], ['EV', 2, 4194], ['EV', 1, 4195],
+  ['EV', 1, 4201], ['EV', 2, 4202], ['EV', 2, 4204], ['EV', 2, 4206], ['EV', 1, 4214],
+  ['EV', 2, 4216], ['EV', 1, 4223], ['EV', 2, 4224], ['EV', 1, 4233], ['EV', 1, 4235],
+  ['EV', 1, 4241], ['EV', 2, 4246], ['EV', 1, 4247], ['EV', 1, 4250], ['EV', 2, 4254],
+  ['EV', 1, 4255], ['EV', 2, 4257], ['EV', 1, 4260], ['EV', 1, 4272], ['EV', 1, 4275],
+  ['EV', 2, 4276], ['EV', 1, 4277], ['EV', 2, 4292], ['EV', 3, 4294], ['EV', 2, 4299],
+  ['EV', 1, 4300], ['EV', 2, 4308], ['EV', 2, 4312], ['EV', 1, 4316], ['EV', 1, 4317],
+  ['EV', 2, 4321], ['EV', 2, 4322], ['EV', 2, 4326], ['EV', 2, 4333], ['EV', 3, 4334],
+  ['EV', 1, 4336], ['EV', 2, 4340], ['EV', 2, 4347], ['EV', 1, 4348], ['EV', 2, 4352],
+  ['EV', 1, 4356], ['EV', 2, 4361], ['EV', 2, 4364], ['EV', 2, 4370], ['EV', 1, 4371],
+  ['EV', 2, 4372], ['EV', 2, 4373], ['EV', 2, 4382], ['EV', 3, 4388], ['EV', 2, 4390],
+  ['EV', 2, 4404], ['EV', 3, 4406], ['EV', 2, 4409], ['EV', 3, 4412], ['EV', 2, 4417],
+  ['EV', 1, 4419], ['EV', 1, 4420], ['EV', 1, 4424], ['EV', 2, 4434], ['EV', 1, 4440],
+  ['EV', 1, 4457], ['EV', 1, 4460], ['EV', 2, 4462], ['EV', 1, 4471], ['EV', 2, 4479],
+  ['EV', 1, 4485], ['EV', 2, 4495], ['EV', 2, 4497], ['EV', 2, 4502], ['EV', 2, 4511],
+  ['EV', 2, 4516], ['EV', 2, 4532], ['EV', 3, 4537], ['EV', 1, 4539], ['EV', 2, 4543],
+  ['EV', 3, 4548], ['EV', 2, 4552], ['EV', 1, 4559], ['EV', 1, 4560], ['EV', 2, 4572],
+  ['EV', 1, 4576], ['EV', 2, 4580], ['EV', 2, 4581], ['EV', 1, 4583], ['EV', 1, 4600],
+  ['EV', 1, 4610], ['EV', 1, 4617], ['EV', 1, 4626], ['EV', 2, 4633], ['EV', 2, 4636],
+  ['EV', 2, 4640], ['EV', 1, 4644], ['EV', 1, 4645], ['EV', 2, 4660], ['EV', 1, 4665],
+  ['EV', 1, 4679], ['EV', 2, 4681], ['EV', 1, 4687], ['EV', 2, 4690], ['EV', 2, 4691],
+  ['EV', 1, 4692], ['EV', 1, 4693], ['EV', 1, 4695], ['EV', 1, 4702], ['EV', 2, 4705],
+  ['EV', 1, 4708], ['EV', 2, 4709], ['EV', 1, 4869], ['EV', 1, 4876], ['EV', 1, 4922],
+  ['EV', 2, 4935], ['EV', 1, 4941], ['EV', 1, 5026], ['EV', 1, 5114], ['EV', 1, 5132],
+  ['EV', 1, 5147], ['EV', 1, 5163], ['EV', 1, 5218], ['EV', 1, 5259], ['EV', 1, 5310],
+  ['EV', 2, 5311], ['EV', 2, 5675], ['EV', 1, 5694], ['EV', 2, 5708], ['EV', 2, 5709],
+  ['EV', 2, 5710], ['EV', 2, 5712], ['EV', 2, 5714], ['EV', 1, 5716], ['EV', 2, 5736],
+  ['EV', 2, 5742], ['F9', 2, 511], ['F9', 3, 835], ['FL', 2, 345], ['FL', 3, 346], ['FL', 2, 347],
+  ['FL', 2, 348], ['FL', 2, 349], ['FL', 2, 353], ['FL', 2, 354], ['FL', 2, 620], ['FL', 2, 623],
+  ['FL', 2, 645], ['FL', 3, 850], ['HA', 2, 51], ['MQ', 2, 3695], ['MQ', 2, 3697], ['MQ', 2, 3728],
+  ['MQ', 2, 3730], ['MQ', 3, 3737], ['MQ', 2, 3744], ['MQ', 3, 3768], ['MQ', 2, 3783],
+  ['MQ', 2, 3792], ['MQ', 2, 3795], ['MQ', 2, 3823], ['MQ', 2, 3944], ['MQ', 2, 3985],
+  ['MQ', 2, 4146], ['MQ', 2, 4172], ['MQ', 2, 4255], ['MQ', 2, 4309], ['MQ', 2, 4323],
+  ['MQ', 2, 4333], ['MQ', 3, 4401], ['MQ', 2, 4403], ['MQ', 2, 4404], ['MQ', 3, 4406],
+  ['MQ', 2, 4410], ['MQ', 2, 4413], ['MQ', 2, 4415], ['MQ', 3, 4418], ['MQ', 2, 4423],
+  ['MQ', 2, 4425], ['MQ', 2, 4426], ['MQ', 2, 4429], ['MQ', 2, 4431], ['MQ', 2, 4447],
+  ['MQ', 2, 4449], ['MQ', 2, 4471], ['MQ', 2, 4475], ['MQ', 3, 4478], ['MQ', 2, 4479],
+  ['MQ', 2, 4484], ['MQ', 2, 4485], ['MQ', 3, 4490], ['MQ', 2, 4491], ['MQ', 2, 4507],
+  ['MQ', 2, 4517], ['MQ', 1, 4518], ['MQ', 2, 4521], ['MQ', 2, 4525], ['MQ', 3, 4534],
+  ['MQ', 2, 4540], ['MQ', 2, 4553], ['MQ', 2, 4555], ['MQ', 3, 4558], ['MQ', 2, 4564],
+  ['MQ', 2, 4569], ['MQ', 2, 4573], ['MQ', 3, 4576], ['MQ', 2, 4577], ['MQ', 2, 4579],
+  ['MQ', 2, 4582], ['MQ', 2, 4584], ['MQ', 2, 4588], ['MQ', 2, 4589], ['MQ', 2, 4599],
+  ['MQ', 2, 4601], ['MQ', 3, 4610], ['MQ', 2, 4622], ['MQ', 2, 4626], ['MQ', 2, 4646],
+  ['MQ', 2, 4649], ['MQ', 3, 4650], ['MQ', 2, 4654], ['MQ', 3, 4655], ['MQ', 2, 4658],
+  ['MQ', 2, 4660], ['MQ', 2, 4661], ['MQ', 2, 4662], ['MQ', 2, 4669], ['MQ', 2, 4670],
+  ['MQ', 2, 4674], ['UA', 2, 15], ['UA', 1, 16], ['UA', 1, 32], ['UA', 1, 69], ['UA', 2, 80],
+  ['UA', 1, 162], ['UA', 1, 194], ['UA', 2, 222], ['UA', 2, 223], ['UA', 1, 235], ['UA', 1, 251],
+  ['UA', 1, 255], ['UA', 2, 257], ['UA', 1, 277], ['UA', 1, 278], ['UA', 1, 279], ['UA', 1, 285],
+  ['UA', 1, 289], ['UA', 2, 299], ['UA', 3, 303], ['UA', 1, 311], ['UA', 1, 315], ['UA', 1, 317],
+  ['UA', 1, 320], ['UA', 2, 328], ['UA', 1, 338], ['UA', 1, 341], ['UA', 2, 342], ['UA', 1, 365],
+  ['UA', 1, 367], ['UA', 1, 369], ['UA', 1, 375], ['UA', 1, 376], ['UA', 2, 379], ['UA', 1, 380],
+  ['UA', 1, 387], ['UA', 2, 389], ['UA', 2, 391], ['UA', 1, 392], ['UA', 1, 393], ['UA', 2, 397],
+  ['UA', 1, 402], ['UA', 1, 405], ['UA', 2, 407], ['UA', 1, 421], ['UA', 1, 423], ['UA', 1, 428],
+  ['UA', 1, 429], ['UA', 1, 437], ['UA', 1, 443], ['UA', 1, 448], ['UA', 1, 455], ['UA', 1, 456],
+  ['UA', 1, 457], ['UA', 1, 459], ['UA', 1, 460], ['UA', 1, 465], ['UA', 2, 468], ['UA', 2, 473],
+  ['UA', 1, 477], ['UA', 1, 479], ['UA', 1, 482], ['UA', 1, 488], ['UA', 1, 491], ['UA', 1, 493],
+  ['UA', 1, 496], ['UA', 1, 501], ['UA', 1, 505], ['UA', 2, 509], ['UA', 1, 510], ['UA', 2, 512],
+  ['UA', 1, 516], ['UA', 2, 530], ['UA', 2, 535], ['UA', 1, 544], ['UA', 1, 549], ['UA', 1, 550],
+  ['UA', 1, 556], ['UA', 1, 566], ['UA', 1, 569], ['UA', 1, 572], ['UA', 1, 580], ['UA', 1, 597],
+  ['UA', 1, 601], ['UA', 1, 604], ['UA', 1, 617], ['UA', 2, 618], ['UA', 1, 623], ['UA', 1, 627],
+  ['UA', 1, 633], ['UA', 1, 635], ['UA', 1, 636], ['UA', 1, 638], ['UA', 1, 642], ['UA', 1, 651],
+  ['UA', 1, 667], ['UA', 1, 668], ['UA', 1, 683], ['UA', 1, 685], ['UA', 1, 687], ['UA', 1, 688],
+  ['UA', 1, 689], ['UA', 1, 695], ['UA', 1, 698], ['UA', 1, 701], ['UA', 1, 702], ['UA', 2, 703],
+  ['UA', 2, 754], ['UA', 1, 756], ['UA', 1, 759], ['UA', 1, 762], ['UA', 1, 765], ['UA', 1, 772],
+  ['UA', 1, 779], ['UA', 1, 783], ['UA', 1, 784], ['UA', 1, 785], ['UA', 1, 799], ['UA', 2, 834],
+  ['UA', 1, 849], ['UA', 1, 856], ['UA', 1, 871], ['UA', 1, 883], ['UA', 1, 906], ['UA', 1, 908],
+  ['UA', 1, 910], ['UA', 2, 926], ['UA', 2, 927], ['UA', 1, 960], ['UA', 1, 962], ['UA', 1, 974],
+  ['UA', 1, 979], ['UA', 1, 984], ['UA', 2, 985], ['UA', 1, 987], ['UA', 1, 991], ['UA', 1, 994],
+  ['UA', 1, 997], ['UA', 1, 1004], ['UA', 2, 1010], ['UA', 2, 1018], ['UA', 1, 1037],
+  ['UA', 1, 1051], ['UA', 2, 1053], ['UA', 1, 1059], ['UA', 2, 1060], ['UA', 1, 1067],
+  ['UA', 2, 1071], ['UA', 2, 1075], ['UA', 2, 1077], ['UA', 1, 1078], ['UA', 1, 1086],
+  ['UA', 1, 1091], ['UA', 1, 1092], ['UA', 1, 1105], ['UA', 1, 1106], ['UA', 1, 1107],
+  ['UA', 1, 1108], ['UA', 1, 1109], ['UA', 1, 1111], ['UA', 2, 1114], ['UA', 1, 1115],
+  ['UA', 1, 1120], ['UA', 1, 1121], ['UA', 1, 1122], ['UA', 1, 1124], ['UA', 1, 1125],
+  ['UA', 2, 1128], ['UA', 1, 1134], ['UA', 1, 1136], ['UA', 1, 1139], ['UA', 1, 1141],
+  ['UA', 2, 1143], ['UA', 2, 1148], ['UA', 2, 1152], ['UA', 1, 1153], ['UA', 1, 1158],
+  ['UA', 3, 1162], ['UA', 1, 1164], ['UA', 1, 1165], ['UA', 1, 1166], ['UA', 1, 1170],
+  ['UA', 1, 1177], ['UA', 2, 1178], ['UA', 1, 1180], ['UA', 1, 1184], ['UA', 1, 1186],
+  ['UA', 2, 1187], ['UA', 1, 1197], ['UA', 1, 1199], ['UA', 1, 1200], ['UA', 1, 1203],
+  ['UA', 1, 1204], ['UA', 1, 1209], ['UA', 1, 1215], ['UA', 1, 1218], ['UA', 1, 1220],
+  ['UA', 1, 1221], ['UA', 2, 1222], ['UA', 2, 1223], ['UA', 1, 1228], ['UA', 1, 1233],
+  ['UA', 2, 1241], ['UA', 1, 1242], ['UA', 1, 1244], ['UA', 1, 1248], ['UA', 1, 1258],
+  ['UA', 2, 1259], ['UA', 1, 1268], ['UA', 1, 1269], ['UA', 1, 1271], ['UA', 1, 1276],
+  ['UA', 2, 1280], ['UA', 1, 1284], ['UA', 2, 1292], ['UA', 2, 1294], ['UA', 2, 1296],
+  ['UA', 2, 1299], ['UA', 1, 1401], ['UA', 2, 1416], ['UA', 1, 1422], ['UA', 2, 1425],
+  ['UA', 1, 1434], ['UA', 1, 1435], ['UA', 2, 1444], ['UA', 1, 1453], ['UA', 1, 1455],
+  ['UA', 2, 1461], ['UA', 1, 1462], ['UA', 1, 1477], ['UA', 1, 1479], ['UA', 1, 1480],
+  ['UA', 1, 1481], ['UA', 2, 1482], ['UA', 2, 1483], ['UA', 1, 1492], ['UA', 1, 1496],
+  ['UA', 2, 1506], ['UA', 1, 1509], ['UA', 2, 1517], ['UA', 2, 1519], ['UA', 1, 1524],
+  ['UA', 2, 1526], ['UA', 1, 1528], ['UA', 1, 1545], ['UA', 1, 1552], ['UA', 1, 1555],
+  ['UA', 1, 1556], ['UA', 1, 1563], ['UA', 1, 1570], ['UA', 1, 1575], ['UA', 2, 1587],
+  ['UA', 1, 1592], ['UA', 1, 1593], ['UA', 1, 1595], ['UA', 2, 1597], ['UA', 2, 1600],
+  ['UA', 1, 1601], ['UA', 1, 1605], ['UA', 1, 1606], ['UA', 1, 1609], ['UA', 2, 1615],
+  ['UA', 2, 1623], ['UA', 2, 1625], ['UA', 2, 1626], ['UA', 1, 1627], ['UA', 1, 1629],
+  ['UA', 2, 1635], ['UA', 1, 1641], ['UA', 3, 1643], ['UA', 1, 1649], ['UA', 2, 1663],
+  ['UA', 1, 1665], ['UA', 2, 1668], ['UA', 2, 1670], ['UA', 2, 1676], ['UA', 2, 1680],
+  ['UA', 1, 1684], ['UA', 2, 1687], ['UA', 2, 1695], ['UA', 1, 1696], ['UA', 1, 1699],
+  ['UA', 3, 1701], ['UA', 1, 1702], ['UA', 1, 1712], ['UA', 1, 1714], ['UA', 1, 1715],
+  ['UA', 1, 1718], ['UA', 2, 1724], ['UA', 1, 1726], ['UA', 2, 1741], ['US', 3, 27], ['US', 2, 35],
+  ['US', 2, 75], ['US', 2, 196], ['US', 3, 245], ['US', 2, 373], ['US', 2, 449], ['US', 3, 487],
+  ['US', 2, 656], ['US', 3, 675], ['US', 2, 688], ['US', 2, 720], ['US', 3, 926], ['US', 3, 1019],
+  ['US', 2, 1030], ['US', 2, 1085], ['US', 2, 1103], ['US', 2, 1177], ['US', 2, 1429],
+  ['US', 2, 1433], ['US', 2, 1441], ['US', 2, 1443], ['US', 2, 1445], ['US', 2, 1447],
+  ['US', 2, 1459], ['US', 1, 1467], ['US', 2, 1491], ['US', 2, 1567], ['US', 2, 1615],
+  ['US', 2, 1665], ['US', 3, 1733], ['US', 2, 1833], ['US', 2, 1973], ['US', 1, 2124],
+  ['US', 1, 2128], ['US', 1, 2132], ['US', 2, 2163], ['US', 2, 2171], ['US', 2, 2179],
+  ['US', 2, 2187], ['VX', 3, 11], ['VX', 2, 23], ['VX', 2, 25], ['VX', 2, 27], ['VX', 2, 29],
+  ['VX', 2, 251], ['VX', 3, 399], ['VX', 3, 407], ['VX', 2, 409], ['VX', 2, 411], ['VX', 2, 413],
+  ['VX', 2, 415], ['WN', 2, 20], ['WN', 1, 128], ['WN', 1, 133], ['WN', 1, 190], ['WN', 1, 195],
+  ['WN', 1, 316], ['WN', 1, 321], ['WN', 1, 408], ['WN', 1, 540], ['WN', 1, 564], ['WN', 1, 591],
+  ['WN', 1, 731], ['WN', 2, 733], ['WN', 1, 766], ['WN', 1, 864], ['WN', 1, 900], ['WN', 2, 946],
+  ['WN', 1, 959], ['WN', 1, 1036], ['WN', 1, 1057], ['WN', 1, 1066], ['WN', 1, 1170],
+  ['WN', 1, 1186], ['WN', 1, 1222], ['WN', 2, 1251], ['WN', 1, 1484], ['WN', 1, 1563],
+  ['WN', 1, 1568], ['WN', 1, 1581], ['WN', 1, 1672], ['WN', 2, 1807], ['WN', 2, 2081],
+  ['WN', 1, 2162], ['WN', 1, 2305], ['WN', 1, 2335], ['WN', 1, 2392], ['WN', 1, 2450],
+  ['WN', 1, 2521], ['WN', 1, 2529], ['WN', 1, 2596], ['WN', 1, 2773], ['WN', 1, 2827],
+  ['WN', 1, 2944], ['WN', 1, 2967], ['WN', 1, 3018], ['WN', 1, 3094], ['WN', 1, 3136],
+  ['WN', 1, 3223], ['WN', 1, 3294], ['WN', 1, 3358], ['WN', 1, 3384], ['WN', 1, 3414],
+  ['WN', 1, 3641], ['WN', 1, 3848], ['WN', 1, 3895], ['WN', 1, 4105], ['WN', 2, 4646],
+  ['WN', 1, 4648], ['WN', 1, 4844], ['WN', 1, 4859], ['WN', 1, 4974]]
+};
+
+// Call Code to Build the system ///////////////////////////////////////////////////////////////////
+
+var v  = new BrunelVis('visualization');
+v.build(table1);
+
+</script>
+</body>
+</html>

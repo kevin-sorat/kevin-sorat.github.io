@@ -1,0 +1,76 @@
+{
+    "syntaxes": [
+        {
+            "score": 0.82,
+            "name": "Bar of Values",
+            "syntax": "bar x(carrier) y(flight) sort(#count) tooltip(#all) count(flight)",
+            "description": "A bar chart showing summed values by a field. Numeric data is binned to form a histogram"
+        },
+        {
+            "score": 0.8,
+            "name": "Treemap",
+            "syntax": "treemap x(carrier) color(carrier) size(#count) label(flight) tooltip(#all)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.8,
+            "name": "Heat Map",
+            "syntax": "x(carrier) y(flight) color(#count) sort(#count) tooltip(#all) bin(flight)",
+            "description": "A table of two fields, showing counts"
+        },
+        {
+            "score": 0.77,
+            "name": "Tree",
+            "syntax": "tree x(carrier) size(#count) label(flight) tooltip(#all)",
+            "description": "A treemap of Counts"
+        },
+        {
+            "score": 0.75,
+            "name": "Scatterplot",
+            "syntax": "point x(carrier) y(flight) tooltip(#all)",
+            "description": "Two fields plotted against each other"
+        },
+        {
+            "score": 0.6505382386916237,
+            "name": "Pie Of Values",
+            "syntax": "bar y(flight) stack polar color(carrier) sort(flight) label(carrier, ' (', #count, ')') tooltip(#all) percent(flight) legends(none)",
+            "description": "A pie chart showing summed values by a field. Numeric data is binned to form a histogram"
+        },
+        {
+            "score": 0.63,
+            "name": "Line Chart",
+            "syntax": "line x(flight) y(carrier) tooltip(#all)",
+            "description": "Two fields plotted against each other"
+        },
+        {
+            "score": 0.6148170459575759,
+            "name": "Packed Bubble",
+            "syntax": "bubble color(carrier) size(flight) sort(flight) label(carrier) tooltip(#all)",
+            "description": "A packed bubble chart"
+        },
+        {
+            "score": 0.5714822831899516,
+            "name": "Stacked Counts",
+            "syntax": "bar x(carrier) y(#count) stack color(flight) tooltip(#all) bin(flight)",
+            "description": "A bar chart of counts, stacked by a second field"
+        },
+        {
+            "score": 0.564426946360446,
+            "name": "Clustered Counts",
+            "syntax": "bar x(carrier, flight) y(#count) color(flight) tooltip(#all) bin(flight)",
+            "description": "A bar chart of counts, clustered by a second field"
+        },
+        {
+            "score": 0.2445,
+            "name": "Map of Values",
+            "syntax": "map color(flight) key(carrier) label(carrier) tooltip(carrier) count(flight)",
+            "description": "A map colored by sums of a numeric field"
+        },
+        {
+            "score": 0.242055,
+            "name": "Map of Categories",
+            "syntax": "map color(flight) key(carrier) label(carrier) tooltip(carrier) bin(flight) mode(flight)",
+            "description": "A map colored by mode of a categorical field"
+        }
+    ]
+}
