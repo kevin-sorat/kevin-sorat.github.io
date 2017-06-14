@@ -5,8 +5,8 @@
 <link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/light/looks.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.1/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
-<script src="http://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
-<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
 <script src="https://brunelvis.org/js/brunel.2.4.min.js"</script>
 <script src="https://brunelvis.org/js/brunel.controls.2.4.min.js"</script>
 <style>
@@ -15,193 +15,380 @@
 <body>
 <svg id="visualization" width="600" height="600"></svg>
 <script>
-function  BrunelVis(visId) {
-  "use strict";                                                                       // strict mode
-  var datasets = [],                                      // array of datasets for the original data
-      pre = function(d, i) { return d },                         // default pre-process does nothing
-      post = function(d, i) { return d },                       // default post-process does nothing
-      transitionTime = 200,                                        // transition time for animations
-      charts = [],                                                       // the charts in the system
-      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
-
-  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
-
-  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
-
-  charts[0] = function(parentNode, filterRows) {
-    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 25, 50, 55),
-      elements = [];                                              // array of elements in this chart
-
-    // Define groups for the chart parts ///////////////////////////////////////////////////////////
-
-    var chart =  vis.append('g').attr('class', 'chart1')
-      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
-    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
-    var zoom = d3.zoom().scaleExtent([1/3,3]);
-    var zoomNode = overlay.append('rect').attr('class', 'overlay')
-      .attr('x', geom.inner_left).attr('y', geom.inner_top)
-      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
-      .style('cursor', 'move').call(zoom)
-      .node();
-    zoomNode.__zoom = d3.zoomIdentity;
-    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
-    var interior = chart.append('g').attr('class', 'interior zoomNone')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
-    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
-    var gridGroup = interior.append('g').attr('class', 'grid');
-    var axes = chart.append('g').attr('class', 'axis')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
-    var legends = chart.append('g').attr('class', 'legend')
-      .attr('transform','translate(' + (geom.chart_right-geom.chart_left - 3) + ',' + 0 + ')');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
-      .attr('x', 0).attr('y', 0)
-      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
-
-    // Scales //////////////////////////////////////////////////////////////////////////////////////
-
-    var scale_x = d3.scalePoint().padding(0.5)
-      .domain(['ALB', 'ATL', 'AUS', 'AVL', 'BDL', 'BHM', 'BNA', 'BOS', 'BQN', 'BTV', 'BUF', 'BUR', 'BWI', 'CAK', 'CHS', 'CLE', 'CLT', 'CMH', 'CRW', 'CVG', 'DAY', 'DCA', 'DEN', 'DFW', 'DSM', 'DTW', 'EGE', 'FLL', 'GRR', 'GSO', 'GSP', 'HNL', 'HOU', 'IAD', 'IAH', 'IND', 'JAC', 'JAX', 'LAS', 'LAX', 'LGB', 'MCI', 'MCO', 'MDW', 'MEM', 'MHT', 'MIA', 'MKE', 'MSN', 'MSP', 'MSY', 'MYR', 'OAK', 'OKC', 'OMA', 'ORD', 'ORF', 'PBI', 'PDX', 'PHL', 'PHX', 'PIT', 'PSE', 'PVD', 'PWM', 'RDU', 'RIC', 'ROC', 'RSW', 'SAN', 'SAT', 'SAV', 'SDF', 'SEA', 'SFO', 'SJC', 'SJU', 'SLC', 'SMF', 'SNA', 'SRQ', 'STL', 'STT', 'SYR', 'TPA', 'TUL', 'TYS', 'XNA'])
-      .range([0, geom.inner_width]);
-    var scale_inner = d3.scaleLinear().domain([0,1])
-      .range([-0.5, 0.5]);
-    var scale_y = d3.scaleSqrt().domain([0, 120.00001])
-      .range([geom.inner_height, 0]);
-    var base_scales = [scale_x, scale_y];                           // untransformed original scales
-
-    // Axes ////////////////////////////////////////////////////////////////////////////////////////
-
-    axes.append('g').attr('class', 'x axis')
-      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
-      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
-    axes.select('g.axis.x').append('text').attr('class', 'title').text('dest').style('text-anchor', 'middle')
-      .attr('x',geom.inner_rawWidth/2)
-      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
-    axes.append('g').attr('class', 'y axis')
-      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
-      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
-
-    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 33.0)));
-    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
-
-    function buildAxes(time) {
-      axis_bottom.tickValues(BrunelD3.filterTicks(scale_x))
-      var axis_x = axes.select('g.axis.x');
-      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x)).selectAll('.tick text')
-        .attr('transform', function() {
-          var v = this.getComputedTextLength() / Math.sqrt(2)/2;
-          return 'translate(-' + (v+6) + ',' + v + ') rotate(-45)'
-      });
-      var axis_y = axes.select('g.axis.y');
-      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
-    }
-    zoom.on('zoom', function(t, time) {
-        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
-        scale_y = t.rescaleY(base_scales[1]);
-        zoomNode.__zoom = t;
-        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
-        build(time || -1);
-    });
-
-    // Define element #1 ///////////////////////////////////////////////////////////////////////////
-
-    elements[0] = function() {
-      var original, processed,                           // data sets passed in and then transformed
-        element, data,                                 // brunel element information and brunel data
-        selection, merged;                                      // d3 selection and merged selection
-      var elementGroup = interior.append('g').attr('class', 'element1'),
-        main = elementGroup.append('g').attr('class', 'main'),
-        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
-
-      function makeData() {
-        original = datasets[0];
-        if (filterRows) original = original.retainRows(filterRows);
-        processed = pre(original, 0)
-          .summarize('#count=#count:sum; dest=dest:base; carrier=carrier')
-          .stack('#count; dest; carrier; false');
-        processed = post(processed, 0);
-        var f0 = processed.field('#count$lower'),
-          f1 = processed.field('#count$upper'),
-          f2 = processed.field('dest'),
-          f3 = processed.field('#count'),
-          f4 = processed.field('carrier'),
-          f5 = processed.field('#row'),
-          f6 = processed.field('#selection');
-        var keyFunc = function(d) { return f2.value(d)+ '|' + f4.value(d) };
-        data = {
-          $count$lower: function(d) { return f0.value(d.row) },
-          $count$upper: function(d) { return f1.value(d.row) },
-          dest:         function(d) { return f2.value(d.row) },
-          $count:       function(d) { return f3.value(d.row) },
-          carrier:      function(d) { return f4.value(d.row) },
-          $row:         function(d) { return f5.value(d.row) },
-          $selection:   function(d) { return f6.value(d.row) },
-          $count$lower_f:function(d) { return f0.valueFormatted(d.row) },
-          $count$upper_f:function(d) { return f1.valueFormatted(d.row) },
-          dest_f:       function(d) { return f2.valueFormatted(d.row) },
-          $count_f:     function(d) { return f3.valueFormatted(d.row) },
-          carrier_f:    function(d) { return f4.valueFormatted(d.row) },
-          $row_f:       function(d) { return f5.valueFormatted(d.row) },
-          $selection_f: function(d) { return f6.valueFormatted(d.row) },
-          _split:       function(d) { return f4.value(d.row) },
-          _key:         keyFunc,
-          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
-        };
-      }
-      // Aesthetic Functions
-      var scale_color = d3.scaleOrdinal()
-        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
-        .range([ '#347DAD', '#D43F58', '#F7D84A', '#31A461', '#A66A9C', '#FF954D', 
-          '#A7978E', '#FFCA4D', '#F99EAF', '#B1C43B', '#7E64A2', '#FFB04D', '#CA5C7C', 
-          '#DDBC8C', '#FFA28D', '#A5473D', '#8B6141', '#F57357', '#5C6B46']);
-      var color = function(d) { return scale_color(data.carrier(d)) };
-      legends._legend = legends._legend || { title: ['carrier'], 
-        ticks: scale_color.domain()};
-      legends._legend.color = scale_color;
-
-      // Build element from data ///////////////////////////////////////////////////////////////////
-
-      function build(transitionMillis) {
-        element = elements[0];
-        var w = 0.9 * Math.abs(scale_x(scale_x.domain()[1]) - scale_x(scale_x.domain()[0]) );
-        var x = function(d) { return scale_x(data.dest(d))};
-        var h = geom.default_point_size;
-        var y1 = function(d) { return scale_y(data.$count$lower(d))};
-        var y2 = function(d) { return scale_y(data.$count$upper(d))};
-        var y = function(d) { return scale_y( (data.$count$upper(d) + data.$count$lower(d) )/2)};
-
-        // Define selection entry operations
-        function initialState(selection) {
-          selection
-            .attr('class', 'element bar filled')
-        }
-
-        // Define selection update operations on merged data
-        function updateState(selection) {
-          selection
-            .each(function(d) {
-              var width = w, left = x(d) - width/2, 
-              c = y1(d), d = y2(d), top = Math.min(c,d), height = Math.max(1e-6, Math.abs(c-d));
-              this.r = {x:left, y:top, w:width, h:height};
-            })
-            .attr('x', function(d) { return this.r.x })
-            .attr('y', function(d) { return this.r.y })
-            .attr('width', function(d) { return this.r.w })
-            .attr('height', function(d) { return this.r.h })
-            .filter(BrunelD3.hasData)                     // following only performed for data items
-            .style('fill', color);
-        }
-
-        // Define labeling for the selection
-        function label(selection, transitionMillis) {
-
-          var tooltipLabeling  = {
-            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
-            fit: true, granularity: 0,
-            content: function(d) {
+function  BrunelVis(visId) {
+
+  "use strict";                                                                       // strict mode
+
+  var datasets = [],                                      // array of datasets for the original data
+
+      pre = function(d, i) { return d },                         // default pre-process does nothing
+
+      post = function(d, i) { return d },                       // default post-process does nothing
+
+      transitionTime = 200,                                        // transition time for animations
+
+      charts = [],                                                       // the charts in the system
+
+      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
+
+
+
+  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
+
+
+
+  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
+
+
+
+  charts[0] = function(parentNode, filterRows) {
+
+    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 25, 50, 55),
+
+      elements = [];                                              // array of elements in this chart
+
+
+
+    // Define groups for the chart parts ///////////////////////////////////////////////////////////
+
+
+
+    var chart =  vis.append('g').attr('class', 'chart1')
+
+      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
+
+    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
+
+    var zoom = d3.zoom().scaleExtent([1/3,3]);
+
+    var zoomNode = overlay.append('rect').attr('class', 'overlay')
+
+      .attr('x', geom.inner_left).attr('y', geom.inner_top)
+
+      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
+
+      .style('cursor', 'move').call(zoom)
+
+      .node();
+
+    zoomNode.__zoom = d3.zoomIdentity;
+
+    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
+
+    var interior = chart.append('g').attr('class', 'interior zoomNone')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
+
+    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
+
+    var gridGroup = interior.append('g').attr('class', 'grid');
+
+    var axes = chart.append('g').attr('class', 'axis')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
+
+    var legends = chart.append('g').attr('class', 'legend')
+
+      .attr('transform','translate(' + (geom.chart_right-geom.chart_left - 3) + ',' + 0 + ')');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
+
+      .attr('x', 0).attr('y', 0)
+
+      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
+
+
+
+    // Scales //////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    var scale_x = d3.scalePoint().padding(0.5)
+
+      .domain(['ALB', 'ATL', 'AUS', 'AVL', 'BDL', 'BHM', 'BNA', 'BOS', 'BQN', 'BTV', 'BUF', 'BUR', 'BWI', 'CAK', 'CHS', 'CLE', 'CLT', 'CMH', 'CRW', 'CVG', 'DAY', 'DCA', 'DEN', 'DFW', 'DSM', 'DTW', 'EGE', 'FLL', 'GRR', 'GSO', 'GSP', 'HNL', 'HOU', 'IAD', 'IAH', 'IND', 'JAC', 'JAX', 'LAS', 'LAX', 'LGB', 'MCI', 'MCO', 'MDW', 'MEM', 'MHT', 'MIA', 'MKE', 'MSN', 'MSP', 'MSY', 'MYR', 'OAK', 'OKC', 'OMA', 'ORD', 'ORF', 'PBI', 'PDX', 'PHL', 'PHX', 'PIT', 'PSE', 'PVD', 'PWM', 'RDU', 'RIC', 'ROC', 'RSW', 'SAN', 'SAT', 'SAV', 'SDF', 'SEA', 'SFO', 'SJC', 'SJU', 'SLC', 'SMF', 'SNA', 'SRQ', 'STL', 'STT', 'SYR', 'TPA', 'TUL', 'TYS', 'XNA'])
+
+      .range([0, geom.inner_width]);
+
+    var scale_inner = d3.scaleLinear().domain([0,1])
+
+      .range([-0.5, 0.5]);
+
+    var scale_y = d3.scaleSqrt().domain([0, 120.00001])
+
+      .range([geom.inner_height, 0]);
+
+    var base_scales = [scale_x, scale_y];                           // untransformed original scales
+
+
+
+    // Axes ////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    axes.append('g').attr('class', 'x axis')
+
+      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
+
+      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
+
+    axes.select('g.axis.x').append('text').attr('class', 'title').text('dest').style('text-anchor', 'middle')
+
+      .attr('x',geom.inner_rawWidth/2)
+
+      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
+
+    axes.append('g').attr('class', 'y axis')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
+
+      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
+
+
+
+    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 33.0)));
+
+    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
+
+
+
+    function buildAxes(time) {
+
+      axis_bottom.tickValues(BrunelD3.filterTicks(scale_x))
+
+      var axis_x = axes.select('g.axis.x');
+
+      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x)).selectAll('.tick text')
+
+        .attr('transform', function() {
+
+          var v = this.getComputedTextLength() / Math.sqrt(2)/2;
+
+          return 'translate(-' + (v+6) + ',' + v + ') rotate(-45)'
+
+      });
+
+      var axis_y = axes.select('g.axis.y');
+
+      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
+
+    }
+
+    zoom.on('zoom', function(t, time) {
+
+        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
+
+        scale_y = t.rescaleY(base_scales[1]);
+
+        zoomNode.__zoom = t;
+
+        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
+
+        build(time || -1);
+
+    });
+
+
+
+    // Define element #1 ///////////////////////////////////////////////////////////////////////////
+
+
+
+    elements[0] = function() {
+
+      var original, processed,                           // data sets passed in and then transformed
+
+        element, data,                                 // brunel element information and brunel data
+
+        selection, merged;                                      // d3 selection and merged selection
+
+      var elementGroup = interior.append('g').attr('class', 'element1'),
+
+        main = elementGroup.append('g').attr('class', 'main'),
+
+        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
+
+
+
+      function makeData() {
+
+        original = datasets[0];
+
+        if (filterRows) original = original.retainRows(filterRows);
+
+        processed = pre(original, 0)
+
+          .summarize('#count=#count:sum; dest=dest:base; carrier=carrier')
+
+          .stack('#count; dest; carrier; false');
+
+        processed = post(processed, 0);
+
+        var f0 = processed.field('#count$lower'),
+
+          f1 = processed.field('#count$upper'),
+
+          f2 = processed.field('dest'),
+
+          f3 = processed.field('#count'),
+
+          f4 = processed.field('carrier'),
+
+          f5 = processed.field('#row'),
+
+          f6 = processed.field('#selection');
+
+        var keyFunc = function(d) { return f2.value(d)+ '|' + f4.value(d) };
+
+        data = {
+
+          $count$lower: function(d) { return f0.value(d.row) },
+
+          $count$upper: function(d) { return f1.value(d.row) },
+
+          dest:         function(d) { return f2.value(d.row) },
+
+          $count:       function(d) { return f3.value(d.row) },
+
+          carrier:      function(d) { return f4.value(d.row) },
+
+          $row:         function(d) { return f5.value(d.row) },
+
+          $selection:   function(d) { return f6.value(d.row) },
+
+          $count$lower_f:function(d) { return f0.valueFormatted(d.row) },
+
+          $count$upper_f:function(d) { return f1.valueFormatted(d.row) },
+
+          dest_f:       function(d) { return f2.valueFormatted(d.row) },
+
+          $count_f:     function(d) { return f3.valueFormatted(d.row) },
+
+          carrier_f:    function(d) { return f4.valueFormatted(d.row) },
+
+          $row_f:       function(d) { return f5.valueFormatted(d.row) },
+
+          $selection_f: function(d) { return f6.valueFormatted(d.row) },
+
+          _split:       function(d) { return f4.value(d.row) },
+
+          _key:         keyFunc,
+
+          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
+
+        };
+
+      }
+
+      // Aesthetic Functions
+
+      var scale_color = d3.scaleOrdinal()
+
+        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
+
+        .range([ '#347DAD', '#D43F58', '#F7D84A', '#31A461', '#A66A9C', '#FF954D', 
+
+          '#A7978E', '#FFCA4D', '#F99EAF', '#B1C43B', '#7E64A2', '#FFB04D', '#CA5C7C', 
+
+          '#DDBC8C', '#FFA28D', '#A5473D', '#8B6141', '#F57357', '#5C6B46']);
+
+      var color = function(d) { return scale_color(data.carrier(d)) };
+
+      legends._legend = legends._legend || { title: ['carrier'], 
+
+        ticks: scale_color.domain()};
+
+      legends._legend.color = scale_color;
+
+
+
+      // Build element from data ///////////////////////////////////////////////////////////////////
+
+
+
+      function build(transitionMillis) {
+
+        element = elements[0];
+
+        var w = 0.9 * Math.abs(scale_x(scale_x.domain()[1]) - scale_x(scale_x.domain()[0]) );
+
+        var x = function(d) { return scale_x(data.dest(d))};
+
+        var h = geom.default_point_size;
+
+        var y1 = function(d) { return scale_y(data.$count$lower(d))};
+
+        var y2 = function(d) { return scale_y(data.$count$upper(d))};
+
+        var y = function(d) { return scale_y( (data.$count$upper(d) + data.$count$lower(d) )/2)};
+
+
+
+        // Define selection entry operations
+
+        function initialState(selection) {
+
+          selection
+
+            .attr('class', 'element bar filled')
+
+        }
+
+
+
+        // Define selection update operations on merged data
+
+        function updateState(selection) {
+
+          selection
+
+            .each(function(d) {
+
+              var width = w, left = x(d) - width/2, 
+
+              c = y1(d), d = y2(d), top = Math.min(c,d), height = Math.max(1e-6, Math.abs(c-d));
+
+              this.r = {x:left, y:top, w:width, h:height};
+
+            })
+
+            .attr('x', function(d) { return this.r.x })
+
+            .attr('y', function(d) { return this.r.y })
+
+            .attr('width', function(d) { return this.r.w })
+
+            .attr('height', function(d) { return this.r.h })
+
+            .filter(BrunelD3.hasData)                     // following only performed for data items
+
+            .style('fill', color);
+
+        }
+
+
+
+        // Define labeling for the selection
+
+        function label(selection, transitionMillis) {
+
+
+
+          var tooltipLabeling  = {
+
+            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
+
+            fit: true, granularity: 0,
+
+            content: function(d) {
+
               return d.row == null ? null : '<span class="title">dest: </span>'
 			+ '<span class="field">' + data.dest_f(d) + '</span>'
 			+ '<br/>'
@@ -209,146 +396,286 @@ function  BrunelVis(visId) {
 			+ '<span class="field">' + data.$count_f(d) + '</span>'
 			+ '<br/>'
 			+ '<span class="title">carrier: </span>'
-			+ '<span class="field">' + data.carrier_f(d) + '</span>'
-            }
-          };
-          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
-        }
-        // Create selections, set the initial state and transition updates
-        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
-        var added = selection.enter().append('rect');
-        merged = selection.merge(added);
-        initialState(added);
-        selection.filter(BrunelD3.hasData)
-          .classed('selected', BrunelD3.isSelected(data))
-          .filter(BrunelD3.isSelected(data)).raise();
-        updateState(BrunelD3.transition(merged, transitionMillis));
-        label(merged, transitionMillis);
-
-        BrunelD3.transition(selection.exit(), transitionMillis/3)
-          .style('opacity', 0.5).each( function() {
-            this.remove(); BrunelD3.removeLabels(this); 
-        });
-      }
-
-      return {
-        data:           function() { return processed },
-        original:       function() { return original },
-        internal:       function() { return data },
-        selection:      function() { return merged },
-        makeData:       makeData,
-        build:          build,
-        chart:          function() { return charts[0] },
-        group:          function() { return elementGroup },
-        fields: {
-          x:            ['dest'],
-          y:            ['#count'],
-          key:          ['dest', 'carrier'],
-          color:        ['carrier']
-        }
-      };
-    }();
-
-    function build(time, noData) {
-      var first = elements[0].data() == null;
-      if (first) time = 0;                                           // no transition for first call
-      buildAxes(time);
-      if ((first || time > -1) && !noData) {
-        elements[0].makeData();
-        BrunelD3.addLegend(legends, legends._legend);
-      }
-      elements[0].build(time);
-    }
-
-    // Expose the following components of the chart
-    return {
-      elements : elements,
-      interior : interior,
-      scales: {x:scale_x, y:scale_y},
-      zoom: function(params, time) {
-          if (params) zoom.on('zoom').call(zoomNode, params, time);
-          return d3.zoomTransform(zoomNode);
-      },
-      build : build
-    };
-    }();
-
-  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
-  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
-  function buildAll() {
-    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
-    updateAll(transitionTime);
-  }
-
-  return {
-    dataPreProcess:     function(f) { if (f) pre = f; return pre },
-    dataPostProcess:    function(f) { if (f) post = f; return post },
-    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
-    visId:              visId,
-    build:              buildAll,
-    rebuild:            updateAll,
-    charts:             charts
-  }
-}
-
-// Data Tables /////////////////////////////////////////////////////////////////////////////////////
-
-var table1 = {
-   summarized: true,
-   names: ['dest', '#count', 'carrier'], 
-   options: ['string', 'numeric', 'string'], 
-   rows: [['BNA', 2, '9E'], ['BOS', 3, '9E'], ['BUF', 5, '9E'], ['BWI', 6, '9E'], ['CHS', 2, '9E'],
-  ['CLE', 2, '9E'], ['CLT', 2, '9E'], ['CVG', 8, '9E'], ['DCA', 4, '9E'], ['DFW', 2, '9E'],
-  ['DTW', 3, '9E'], ['GRR', 1, '9E'], ['IAD', 2, '9E'], ['IND', 2, '9E'], ['JAX', 2, '9E'],
-  ['MEM', 1, '9E'], ['MSP', 5, '9E'], ['MSY', 2, '9E'], ['ORD', 6, '9E'], ['ORF', 1, '9E'],
-  ['PHL', 5, '9E'], ['PIT', 5, '9E'], ['RDU', 6, '9E'], ['RIC', 1, '9E'], ['ROC', 3, '9E'],
-  ['SAT', 1, '9E'], ['SYR', 2, '9E'], ['TYS', 1, '9E'], ['AUS', 2, 'AA'], ['BOS', 9, 'AA'],
-  ['DFW', 47, 'AA'], ['EGE', 2, 'AA'], ['FLL', 5, 'AA'], ['LAS', 2, 'AA'], ['LAX', 22, 'AA'],
-  ['MCO', 5, 'AA'], ['MIA', 44, 'AA'], ['ORD', 34, 'AA'], ['SAN', 2, 'AA'], ['SEA', 2, 'AA'],
-  ['SFO', 9, 'AA'], ['SJU', 9, 'AA'], ['STL', 8, 'AA'], ['STT', 3, 'AA'], ['TPA', 2, 'AA'],
-  ['SEA', 5, 'AS'], ['AUS', 4, 'B6'], ['BOS', 22, 'B6'], ['BQN', 6, 'B6'], ['BTV', 7, 'B6'],
-  ['BUF', 16, 'B6'], ['BUR', 4, 'B6'], ['CLT', 4, 'B6'], ['DEN', 2, 'B6'], ['FLL', 49, 'B6'],
-  ['HOU', 4, 'B6'], ['IAD', 4, 'B6'], ['JAX', 7, 'B6'], ['LAS', 7, 'B6'], ['LAX', 11, 'B6'],
-  ['LGB', 4, 'B6'], ['MCO', 44, 'B6'], ['MSY', 7, 'B6'], ['OAK', 2, 'B6'], ['ORD', 5, 'B6'],
-  ['PBI', 28, 'B6'], ['PDX', 2, 'B6'], ['PHX', 2, 'B6'], ['PIT', 5, 'B6'], ['PSE', 2, 'B6'],
-  ['PWM', 6, 'B6'], ['RDU', 6, 'B6'], ['ROC', 7, 'B6'], ['RSW', 17, 'B6'], ['SAN', 5, 'B6'],
-  ['SEA', 2, 'B6'], ['SFO', 7, 'B6'], ['SJC', 2, 'B6'], ['SJU', 24, 'B6'], ['SLC', 2, 'B6'],
-  ['SMF', 2, 'B6'], ['SRQ', 7, 'B6'], ['SYR', 7, 'B6'], ['TPA', 21, 'B6'], ['ATL', 62, 'DL'],
-  ['AUS', 2, 'DL'], ['BOS', 5, 'DL'], ['BUF', 3, 'DL'], ['CVG', 3, 'DL'], ['DCA', 2, 'DL'],
-  ['DEN', 8, 'DL'], ['DTW', 25, 'DL'], ['FLL', 17, 'DL'], ['LAS', 10, 'DL'], ['LAX', 14, 'DL'],
-  ['MCI', 2, 'DL'], ['MCO', 22, 'DL'], ['MEM', 2, 'DL'], ['MIA', 16, 'DL'], ['MSP', 18, 'DL'],
-  ['MSY', 5, 'DL'], ['PBI', 10, 'DL'], ['PDX', 3, 'DL'], ['PHX', 2, 'DL'], ['PIT', 1, 'DL'],
-  ['PWM', 1, 'DL'], ['RSW', 9, 'DL'], ['SAN', 4, 'DL'], ['SAT', 1, 'DL'], ['SEA', 6, 'DL'],
-  ['SFO', 10, 'DL'], ['SJU', 7, 'DL'], ['SLC', 13, 'DL'], ['SRQ', 2, 'DL'], ['TPA', 13, 'DL'],
-  ['ALB', 6, 'EV'], ['ATL', 10, 'EV'], ['AVL', 2, 'EV'], ['BDL', 4, 'EV'], ['BHM', 1, 'EV'],
-  ['BNA', 6, 'EV'], ['BTV', 9, 'EV'], ['BUF', 11, 'EV'], ['BWI', 5, 'EV'], ['CHS', 8, 'EV'],
-  ['CLE', 2, 'EV'], ['CLT', 7, 'EV'], ['CMH', 7, 'EV'], ['CVG', 9, 'EV'], ['DAY', 6, 'EV'],
-  ['DCA', 13, 'EV'], ['DSM', 2, 'EV'], ['DTW', 9, 'EV'], ['GRR', 6, 'EV'], ['GSO', 6, 'EV'],
-  ['GSP', 3, 'EV'], ['IAD', 25, 'EV'], ['IND', 7, 'EV'], ['JAX', 5, 'EV'], ['MCI', 6, 'EV'],
-  ['MEM', 7, 'EV'], ['MHT', 8, 'EV'], ['MKE', 7, 'EV'], ['MSN', 2, 'EV'], ['MSP', 5, 'EV'],
-  ['MSY', 1, 'EV'], ['MYR', 3, 'EV'], ['OKC', 2, 'EV'], ['OMA', 6, 'EV'], ['ORF', 1, 'EV'],
-  ['PIT', 9, 'EV'], ['PVD', 2, 'EV'], ['PWM', 10, 'EV'], ['RDU', 11, 'EV'], ['RIC', 10, 'EV'],
-  ['ROC', 4, 'EV'], ['SAV', 4, 'EV'], ['SDF', 5, 'EV'], ['STL', 8, 'EV'], ['SYR', 2, 'EV'],
-  ['TUL', 2, 'EV'], ['TYS', 2, 'EV'], ['XNA', 2, 'EV'], ['DEN', 5, 'F9'], ['ATL', 17, 'FL'],
-  ['CAK', 4, 'FL'], ['MKE', 3, 'FL'], ['HNL', 2, 'HA'], ['ATL', 16, 'MQ'], ['BNA', 15, 'MQ'],
-  ['BWI', 2, 'MQ'], ['CLE', 11, 'MQ'], ['CLT', 11, 'MQ'], ['CMH', 17, 'MQ'], ['CRW', 2, 'MQ'],
-  ['CVG', 2, 'MQ'], ['DCA', 13, 'MQ'], ['DTW', 14, 'MQ'], ['IND', 2, 'MQ'], ['MSP', 8, 'MQ'],
-  ['ORD', 18, 'MQ'], ['ORF', 2, 'MQ'], ['PIT', 2, 'MQ'], ['RDU', 28, 'MQ'], ['XNA', 7, 'MQ'],
-  ['AUS', 6, 'UA'], ['BOS', 15, 'UA'], ['BQN', 2, 'UA'], ['CLE', 14, 'UA'], ['DEN', 28, 'UA'],
-  ['DFW', 10, 'UA'], ['EGE', 2, 'UA'], ['FLL', 19, 'UA'], ['HNL', 2, 'UA'], ['IAH', 46, 'UA'],
-  ['JAC', 2, 'UA'], ['LAS', 9, 'UA'], ['LAX', 30, 'UA'], ['MCO', 21, 'UA'], ['MIA', 11, 'UA'],
-  ['ORD', 38, 'UA'], ['PBI', 16, 'UA'], ['PDX', 3, 'UA'], ['PHX', 8, 'UA'], ['RSW', 11, 'UA'],
-  ['SAN', 7, 'UA'], ['SAT', 2, 'UA'], ['SEA', 8, 'UA'], ['SFO', 36, 'UA'], ['SJU', 7, 'UA'],
-  ['SNA', 7, 'UA'], ['STT', 2, 'UA'], ['TPA', 13, 'UA'], ['BOS', 3, 'US'], ['CLT', 53, 'US'],
-  ['DCA', 8, 'US'], ['PHL', 3, 'US'], ['PHX', 16, 'US'], ['LAS', 2, 'VX'], ['LAX', 14, 'VX'],
-  ['SFO', 11, 'VX'], ['BWI', 12, 'WN'], ['DEN', 9, 'WN'], ['HOU', 6, 'WN'], ['MDW', 22, 'WN'],
-  ['MKE', 8, 'WN'], ['PHX', 4, 'WN'], ['STL', 7, 'WN']]
-};
-
-// Call Code to Build the system ///////////////////////////////////////////////////////////////////
-
-var v  = new BrunelVis('visualization');
-v.build(table1);
+			+ '<span class="field">' + data.carrier_f(d) + '</span>'
+
+            }
+
+          };
+
+          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
+
+        }
+
+        // Create selections, set the initial state and transition updates
+
+        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
+
+        var added = selection.enter().append('rect');
+
+        merged = selection.merge(added);
+
+        initialState(added);
+
+        selection.filter(BrunelD3.hasData)
+
+          .classed('selected', BrunelD3.isSelected(data))
+
+          .filter(BrunelD3.isSelected(data)).raise();
+
+        updateState(BrunelD3.transition(merged, transitionMillis));
+
+        label(merged, transitionMillis);
+
+
+
+        BrunelD3.transition(selection.exit(), transitionMillis/3)
+
+          .style('opacity', 0.5).each( function() {
+
+            this.remove(); BrunelD3.removeLabels(this); 
+
+        });
+
+      }
+
+
+
+      return {
+
+        data:           function() { return processed },
+
+        original:       function() { return original },
+
+        internal:       function() { return data },
+
+        selection:      function() { return merged },
+
+        makeData:       makeData,
+
+        build:          build,
+
+        chart:          function() { return charts[0] },
+
+        group:          function() { return elementGroup },
+
+        fields: {
+
+          x:            ['dest'],
+
+          y:            ['#count'],
+
+          key:          ['dest', 'carrier'],
+
+          color:        ['carrier']
+
+        }
+
+      };
+
+    }();
+
+
+
+    function build(time, noData) {
+
+      var first = elements[0].data() == null;
+
+      if (first) time = 0;                                           // no transition for first call
+
+      buildAxes(time);
+
+      if ((first || time > -1) && !noData) {
+
+        elements[0].makeData();
+
+        BrunelD3.addLegend(legends, legends._legend);
+
+      }
+
+      elements[0].build(time);
+
+    }
+
+
+
+    // Expose the following components of the chart
+
+    return {
+
+      elements : elements,
+
+      interior : interior,
+
+      scales: {x:scale_x, y:scale_y},
+
+      zoom: function(params, time) {
+
+          if (params) zoom.on('zoom').call(zoomNode, params, time);
+
+          return d3.zoomTransform(zoomNode);
+
+      },
+
+      build : build
+
+    };
+
+    }();
+
+
+
+  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
+
+  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
+
+  function buildAll() {
+
+    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
+
+    updateAll(transitionTime);
+
+  }
+
+
+
+  return {
+
+    dataPreProcess:     function(f) { if (f) pre = f; return pre },
+
+    dataPostProcess:    function(f) { if (f) post = f; return post },
+
+    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
+
+    visId:              visId,
+
+    build:              buildAll,
+
+    rebuild:            updateAll,
+
+    charts:             charts
+
+  }
+
+}
+
+
+
+// Data Tables /////////////////////////////////////////////////////////////////////////////////////
+
+
+
+var table1 = {
+
+   summarized: true,
+
+   names: ['dest', '#count', 'carrier'], 
+
+   options: ['string', 'numeric', 'string'], 
+
+   rows: [['BNA', 2, '9E'], ['BOS', 3, '9E'], ['BUF', 5, '9E'], ['BWI', 6, '9E'], ['CHS', 2, '9E'],
+
+  ['CLE', 2, '9E'], ['CLT', 2, '9E'], ['CVG', 8, '9E'], ['DCA', 4, '9E'], ['DFW', 2, '9E'],
+
+  ['DTW', 3, '9E'], ['GRR', 1, '9E'], ['IAD', 2, '9E'], ['IND', 2, '9E'], ['JAX', 2, '9E'],
+
+  ['MEM', 1, '9E'], ['MSP', 5, '9E'], ['MSY', 2, '9E'], ['ORD', 6, '9E'], ['ORF', 1, '9E'],
+
+  ['PHL', 5, '9E'], ['PIT', 5, '9E'], ['RDU', 6, '9E'], ['RIC', 1, '9E'], ['ROC', 3, '9E'],
+
+  ['SAT', 1, '9E'], ['SYR', 2, '9E'], ['TYS', 1, '9E'], ['AUS', 2, 'AA'], ['BOS', 9, 'AA'],
+
+  ['DFW', 47, 'AA'], ['EGE', 2, 'AA'], ['FLL', 5, 'AA'], ['LAS', 2, 'AA'], ['LAX', 22, 'AA'],
+
+  ['MCO', 5, 'AA'], ['MIA', 44, 'AA'], ['ORD', 34, 'AA'], ['SAN', 2, 'AA'], ['SEA', 2, 'AA'],
+
+  ['SFO', 9, 'AA'], ['SJU', 9, 'AA'], ['STL', 8, 'AA'], ['STT', 3, 'AA'], ['TPA', 2, 'AA'],
+
+  ['SEA', 5, 'AS'], ['AUS', 4, 'B6'], ['BOS', 22, 'B6'], ['BQN', 6, 'B6'], ['BTV', 7, 'B6'],
+
+  ['BUF', 16, 'B6'], ['BUR', 4, 'B6'], ['CLT', 4, 'B6'], ['DEN', 2, 'B6'], ['FLL', 49, 'B6'],
+
+  ['HOU', 4, 'B6'], ['IAD', 4, 'B6'], ['JAX', 7, 'B6'], ['LAS', 7, 'B6'], ['LAX', 11, 'B6'],
+
+  ['LGB', 4, 'B6'], ['MCO', 44, 'B6'], ['MSY', 7, 'B6'], ['OAK', 2, 'B6'], ['ORD', 5, 'B6'],
+
+  ['PBI', 28, 'B6'], ['PDX', 2, 'B6'], ['PHX', 2, 'B6'], ['PIT', 5, 'B6'], ['PSE', 2, 'B6'],
+
+  ['PWM', 6, 'B6'], ['RDU', 6, 'B6'], ['ROC', 7, 'B6'], ['RSW', 17, 'B6'], ['SAN', 5, 'B6'],
+
+  ['SEA', 2, 'B6'], ['SFO', 7, 'B6'], ['SJC', 2, 'B6'], ['SJU', 24, 'B6'], ['SLC', 2, 'B6'],
+
+  ['SMF', 2, 'B6'], ['SRQ', 7, 'B6'], ['SYR', 7, 'B6'], ['TPA', 21, 'B6'], ['ATL', 62, 'DL'],
+
+  ['AUS', 2, 'DL'], ['BOS', 5, 'DL'], ['BUF', 3, 'DL'], ['CVG', 3, 'DL'], ['DCA', 2, 'DL'],
+
+  ['DEN', 8, 'DL'], ['DTW', 25, 'DL'], ['FLL', 17, 'DL'], ['LAS', 10, 'DL'], ['LAX', 14, 'DL'],
+
+  ['MCI', 2, 'DL'], ['MCO', 22, 'DL'], ['MEM', 2, 'DL'], ['MIA', 16, 'DL'], ['MSP', 18, 'DL'],
+
+  ['MSY', 5, 'DL'], ['PBI', 10, 'DL'], ['PDX', 3, 'DL'], ['PHX', 2, 'DL'], ['PIT', 1, 'DL'],
+
+  ['PWM', 1, 'DL'], ['RSW', 9, 'DL'], ['SAN', 4, 'DL'], ['SAT', 1, 'DL'], ['SEA', 6, 'DL'],
+
+  ['SFO', 10, 'DL'], ['SJU', 7, 'DL'], ['SLC', 13, 'DL'], ['SRQ', 2, 'DL'], ['TPA', 13, 'DL'],
+
+  ['ALB', 6, 'EV'], ['ATL', 10, 'EV'], ['AVL', 2, 'EV'], ['BDL', 4, 'EV'], ['BHM', 1, 'EV'],
+
+  ['BNA', 6, 'EV'], ['BTV', 9, 'EV'], ['BUF', 11, 'EV'], ['BWI', 5, 'EV'], ['CHS', 8, 'EV'],
+
+  ['CLE', 2, 'EV'], ['CLT', 7, 'EV'], ['CMH', 7, 'EV'], ['CVG', 9, 'EV'], ['DAY', 6, 'EV'],
+
+  ['DCA', 13, 'EV'], ['DSM', 2, 'EV'], ['DTW', 9, 'EV'], ['GRR', 6, 'EV'], ['GSO', 6, 'EV'],
+
+  ['GSP', 3, 'EV'], ['IAD', 25, 'EV'], ['IND', 7, 'EV'], ['JAX', 5, 'EV'], ['MCI', 6, 'EV'],
+
+  ['MEM', 7, 'EV'], ['MHT', 8, 'EV'], ['MKE', 7, 'EV'], ['MSN', 2, 'EV'], ['MSP', 5, 'EV'],
+
+  ['MSY', 1, 'EV'], ['MYR', 3, 'EV'], ['OKC', 2, 'EV'], ['OMA', 6, 'EV'], ['ORF', 1, 'EV'],
+
+  ['PIT', 9, 'EV'], ['PVD', 2, 'EV'], ['PWM', 10, 'EV'], ['RDU', 11, 'EV'], ['RIC', 10, 'EV'],
+
+  ['ROC', 4, 'EV'], ['SAV', 4, 'EV'], ['SDF', 5, 'EV'], ['STL', 8, 'EV'], ['SYR', 2, 'EV'],
+
+  ['TUL', 2, 'EV'], ['TYS', 2, 'EV'], ['XNA', 2, 'EV'], ['DEN', 5, 'F9'], ['ATL', 17, 'FL'],
+
+  ['CAK', 4, 'FL'], ['MKE', 3, 'FL'], ['HNL', 2, 'HA'], ['ATL', 16, 'MQ'], ['BNA', 15, 'MQ'],
+
+  ['BWI', 2, 'MQ'], ['CLE', 11, 'MQ'], ['CLT', 11, 'MQ'], ['CMH', 17, 'MQ'], ['CRW', 2, 'MQ'],
+
+  ['CVG', 2, 'MQ'], ['DCA', 13, 'MQ'], ['DTW', 14, 'MQ'], ['IND', 2, 'MQ'], ['MSP', 8, 'MQ'],
+
+  ['ORD', 18, 'MQ'], ['ORF', 2, 'MQ'], ['PIT', 2, 'MQ'], ['RDU', 28, 'MQ'], ['XNA', 7, 'MQ'],
+
+  ['AUS', 6, 'UA'], ['BOS', 15, 'UA'], ['BQN', 2, 'UA'], ['CLE', 14, 'UA'], ['DEN', 28, 'UA'],
+
+  ['DFW', 10, 'UA'], ['EGE', 2, 'UA'], ['FLL', 19, 'UA'], ['HNL', 2, 'UA'], ['IAH', 46, 'UA'],
+
+  ['JAC', 2, 'UA'], ['LAS', 9, 'UA'], ['LAX', 30, 'UA'], ['MCO', 21, 'UA'], ['MIA', 11, 'UA'],
+
+  ['ORD', 38, 'UA'], ['PBI', 16, 'UA'], ['PDX', 3, 'UA'], ['PHX', 8, 'UA'], ['RSW', 11, 'UA'],
+
+  ['SAN', 7, 'UA'], ['SAT', 2, 'UA'], ['SEA', 8, 'UA'], ['SFO', 36, 'UA'], ['SJU', 7, 'UA'],
+
+  ['SNA', 7, 'UA'], ['STT', 2, 'UA'], ['TPA', 13, 'UA'], ['BOS', 3, 'US'], ['CLT', 53, 'US'],
+
+  ['DCA', 8, 'US'], ['PHL', 3, 'US'], ['PHX', 16, 'US'], ['LAS', 2, 'VX'], ['LAX', 14, 'VX'],
+
+  ['SFO', 11, 'VX'], ['BWI', 12, 'WN'], ['DEN', 9, 'WN'], ['HOU', 6, 'WN'], ['MDW', 22, 'WN'],
+
+  ['MKE', 8, 'WN'], ['PHX', 4, 'WN'], ['STL', 7, 'WN']]
+
+};
+
+
+
+// Call Code to Build the system ///////////////////////////////////////////////////////////////////
+
+
+
+var v  = new BrunelVis('visualization');
+
+v.build(table1);
+
 
 </script>
 </body>
