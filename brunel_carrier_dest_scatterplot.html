@@ -5,8 +5,8 @@
 <link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/light/looks.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.1/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
-<script src="http://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
-<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
 <script src="https://brunelvis.org/js/brunel.2.4.min.js"</script>
 <script src="https://brunelvis.org/js/brunel.controls.2.4.min.js"</script>
 <style>
@@ -15,596 +15,1182 @@
 <body>
 <svg id="visualization" width="600" height="600"></svg>
 <script>
-function  BrunelVis(visId) {
-  "use strict";                                                                       // strict mode
-  var datasets = [],                                      // array of datasets for the original data
-      pre = function(d, i) { return d },                         // default pre-process does nothing
-      post = function(d, i) { return d },                       // default post-process does nothing
-      transitionTime = 200,                                        // transition time for animations
-      charts = [],                                                       // the charts in the system
-      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
-
-  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
-
-  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
-
-  charts[0] = function(parentNode, filterRows) {
-    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 43, 37, 0),
-      elements = [];                                              // array of elements in this chart
-
-    // Define groups for the chart parts ///////////////////////////////////////////////////////////
-
-    var chart =  vis.append('g').attr('class', 'chart1')
-      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
-    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
-    var zoom = d3.zoom().scaleExtent([1/3,3]);
-    var zoomNode = overlay.append('rect').attr('class', 'overlay')
-      .attr('x', geom.inner_left).attr('y', geom.inner_top)
-      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
-      .style('cursor', 'default')
-      .node();
-    zoomNode.__zoom = d3.zoomIdentity;
-    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
-    var interior = chart.append('g').attr('class', 'interior zoomNone')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
-    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
-    var gridGroup = interior.append('g').attr('class', 'grid');
-    var axes = chart.append('g').attr('class', 'axis')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
-      .attr('x', 0).attr('y', 0)
-      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
-
-    // Scales //////////////////////////////////////////////////////////////////////////////////////
-
-    var scale_x = d3.scalePoint().padding(0.5)
-      .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
-      .range([0, geom.inner_width]);
-    var scale_inner = d3.scaleLinear().domain([0,1])
-      .range([-0.5, 0.5]);
-    var scale_y = d3.scalePoint().padding(0.5)
-      .domain(['XNA', 'TYS', 'TUL', 'TPA', 'SYR', 'STT', 'STL', 'SRQ', 'SNA', 'SMF', 'SLC', 'SJU', 'SJC', 'SFO', 'SEA', 'SDF', 'SAV', 'SAT', 'SAN', 'RSW', 'ROC', 'RIC', 'RDU', 'PWM', 'PVD', 'PSE', 'PIT', 'PHX', 'PHL', 'PDX', 'PBI', 'ORF', 'ORD', 'OMA', 'OKC', 'OAK', 'MYR', 'MSY', 'MSP', 'MSN', 'MKE', 'MIA', 'MHT', 'MEM', 'MDW', 'MCO', 'MCI', 'LGB', 'LAX', 'LAS', 'JAX', 'JAC', 'IND', 'IAH', 'IAD', 'HOU', 'HNL', 'GSP', 'GSO', 'GRR', 'FLL', 'EGE', 'DTW', 'DSM', 'DFW', 'DEN', 'DCA', 'DAY', 'CVG', 'CRW', 'CMH', 'CLT', 'CLE', 'CHS', 'CAK', 'BWI', 'BUR', 'BUF', 'BTV', 'BQN', 'BOS', 'BNA', 'BHM', 'BDL', 'AVL', 'AUS', 'ATL', 'ALB'])
-      .range([geom.inner_height, 0]);
-    var base_scales = [scale_x, scale_y];                           // untransformed original scales
-
-    // Axes ////////////////////////////////////////////////////////////////////////////////////////
-
-    axes.append('g').attr('class', 'x axis')
-      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
-      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
-    axes.select('g.axis.x').append('text').attr('class', 'title').text('carrier').style('text-anchor', 'middle')
-      .attr('x',geom.inner_rawWidth/2)
-      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
-    axes.append('g').attr('class', 'y axis')
-      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
-      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
-    axes.select('g.axis.y').append('text').attr('class', 'title').text('dest').style('text-anchor', 'middle')
-      .attr('x',-geom.inner_rawHeight/2)
-      .attr('y', 4-geom.inner_left).attr('dy', '0.7em').attr('transform', 'rotate(270)');
-
-    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 25.5)));
-    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
-
-    function buildAxes(time) {
-      axis_bottom.tickValues(BrunelD3.filterTicks(scale_x))
-      var axis_x = axes.select('g.axis.x');
-      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x));
-      axis_left.tickValues(BrunelD3.filterTicks(scale_y))
-      var axis_y = axes.select('g.axis.y');
-      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
-    }
-    zoom.on('zoom', function(t, time) {
-        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
-        zoomNode.__zoom = t;
-        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
-        build(time || -1);
-    });
-
-    // Define element #1 ///////////////////////////////////////////////////////////////////////////
-
-    elements[0] = function() {
-      var original, processed,                           // data sets passed in and then transformed
-        element, data,                                 // brunel element information and brunel data
-        selection, merged;                                      // d3 selection and merged selection
-      var elementGroup = interior.append('g').attr('class', 'element1'),
-        main = elementGroup.append('g').attr('class', 'main'),
-        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
-
-      function makeData() {
-        original = datasets[0];
-        if (filterRows) original = original.retainRows(filterRows);
-        processed = pre(original, 0);
-        processed = post(processed, 0);
-        var f0 = processed.field('carrier'),
-          f1 = processed.field('dest'),
-          f2 = processed.field('#row'),
-          f3 = processed.field('#selection');
-        var keyFunc = function(d) { return f2.value(d) };
-        data = {
-          carrier:      function(d) { return f0.value(d.row) },
-          dest:         function(d) { return f1.value(d.row) },
-          $row:         function(d) { return f2.value(d.row) },
-          $selection:   function(d) { return f3.value(d.row) },
-          carrier_f:    function(d) { return f0.valueFormatted(d.row) },
-          dest_f:       function(d) { return f1.valueFormatted(d.row) },
-          $row_f:       function(d) { return f2.valueFormatted(d.row) },
-          $selection_f: function(d) { return f3.valueFormatted(d.row) },
-          _split:       function(d) { return 'ALL' },
-          _key:         keyFunc,
-          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
-        };
-      }
-
-      // Build element from data ///////////////////////////////////////////////////////////////////
-
-      function build(transitionMillis) {
-        element = elements[0];
-        var w = 0.9 * Math.abs(scale_x(scale_x.domain()[1]) - scale_x(scale_x.domain()[0]) );
-        var x = function(d) { return scale_x(data.carrier(d))};
-        var h = 0.9 * Math.abs(scale_y(scale_y.domain()[1]) - scale_y(scale_y.domain()[0]) );
-        var y = function(d) { return scale_y(data.dest(d))};
-
-        // Define selection entry operations
-        function initialState(selection) {
-          selection
-            .attr('class', 'element point filled')
-        }
-
-        // Define selection update operations on merged data
-        function updateState(selection) {
-          selection
-            .each(function(d) {
-              var width = w, left = x(d) - width/2, 
-              height = h, top = y(d) - height/2;
-              this.r = {x:left, y:top, w:width, h:height};
-            })
-            .attr('x', function(d) { return this.r.x })
-            .attr('y', function(d) { return this.r.y })
-            .attr('width', function(d) { return this.r.w })
-            .attr('height', function(d) { return this.r.h });
-        }
-
-        // Define labeling for the selection
-        function label(selection, transitionMillis) {
-
-          var tooltipLabeling  = {
-            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
-            fit: true, granularity: 0,
-            content: function(d) {
+function  BrunelVis(visId) {
+
+  "use strict";                                                                       // strict mode
+
+  var datasets = [],                                      // array of datasets for the original data
+
+      pre = function(d, i) { return d },                         // default pre-process does nothing
+
+      post = function(d, i) { return d },                       // default post-process does nothing
+
+      transitionTime = 200,                                        // transition time for animations
+
+      charts = [],                                                       // the charts in the system
+
+      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
+
+
+
+  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
+
+
+
+  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
+
+
+
+  charts[0] = function(parentNode, filterRows) {
+
+    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 43, 37, 0),
+
+      elements = [];                                              // array of elements in this chart
+
+
+
+    // Define groups for the chart parts ///////////////////////////////////////////////////////////
+
+
+
+    var chart =  vis.append('g').attr('class', 'chart1')
+
+      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
+
+    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
+
+    var zoom = d3.zoom().scaleExtent([1/3,3]);
+
+    var zoomNode = overlay.append('rect').attr('class', 'overlay')
+
+      .attr('x', geom.inner_left).attr('y', geom.inner_top)
+
+      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
+
+      .style('cursor', 'default')
+
+      .node();
+
+    zoomNode.__zoom = d3.zoomIdentity;
+
+    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
+
+    var interior = chart.append('g').attr('class', 'interior zoomNone')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
+
+    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
+
+    var gridGroup = interior.append('g').attr('class', 'grid');
+
+    var axes = chart.append('g').attr('class', 'axis')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
+
+      .attr('x', 0).attr('y', 0)
+
+      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
+
+
+
+    // Scales //////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    var scale_x = d3.scalePoint().padding(0.5)
+
+      .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
+
+      .range([0, geom.inner_width]);
+
+    var scale_inner = d3.scaleLinear().domain([0,1])
+
+      .range([-0.5, 0.5]);
+
+    var scale_y = d3.scalePoint().padding(0.5)
+
+      .domain(['XNA', 'TYS', 'TUL', 'TPA', 'SYR', 'STT', 'STL', 'SRQ', 'SNA', 'SMF', 'SLC', 'SJU', 'SJC', 'SFO', 'SEA', 'SDF', 'SAV', 'SAT', 'SAN', 'RSW', 'ROC', 'RIC', 'RDU', 'PWM', 'PVD', 'PSE', 'PIT', 'PHX', 'PHL', 'PDX', 'PBI', 'ORF', 'ORD', 'OMA', 'OKC', 'OAK', 'MYR', 'MSY', 'MSP', 'MSN', 'MKE', 'MIA', 'MHT', 'MEM', 'MDW', 'MCO', 'MCI', 'LGB', 'LAX', 'LAS', 'JAX', 'JAC', 'IND', 'IAH', 'IAD', 'HOU', 'HNL', 'GSP', 'GSO', 'GRR', 'FLL', 'EGE', 'DTW', 'DSM', 'DFW', 'DEN', 'DCA', 'DAY', 'CVG', 'CRW', 'CMH', 'CLT', 'CLE', 'CHS', 'CAK', 'BWI', 'BUR', 'BUF', 'BTV', 'BQN', 'BOS', 'BNA', 'BHM', 'BDL', 'AVL', 'AUS', 'ATL', 'ALB'])
+
+      .range([geom.inner_height, 0]);
+
+    var base_scales = [scale_x, scale_y];                           // untransformed original scales
+
+
+
+    // Axes ////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    axes.append('g').attr('class', 'x axis')
+
+      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
+
+      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
+
+    axes.select('g.axis.x').append('text').attr('class', 'title').text('carrier').style('text-anchor', 'middle')
+
+      .attr('x',geom.inner_rawWidth/2)
+
+      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
+
+    axes.append('g').attr('class', 'y axis')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
+
+      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
+
+    axes.select('g.axis.y').append('text').attr('class', 'title').text('dest').style('text-anchor', 'middle')
+
+      .attr('x',-geom.inner_rawHeight/2)
+
+      .attr('y', 4-geom.inner_left).attr('dy', '0.7em').attr('transform', 'rotate(270)');
+
+
+
+    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 25.5)));
+
+    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
+
+
+
+    function buildAxes(time) {
+
+      axis_bottom.tickValues(BrunelD3.filterTicks(scale_x))
+
+      var axis_x = axes.select('g.axis.x');
+
+      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x));
+
+      axis_left.tickValues(BrunelD3.filterTicks(scale_y))
+
+      var axis_y = axes.select('g.axis.y');
+
+      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
+
+    }
+
+    zoom.on('zoom', function(t, time) {
+
+        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
+
+        zoomNode.__zoom = t;
+
+        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
+
+        build(time || -1);
+
+    });
+
+
+
+    // Define element #1 ///////////////////////////////////////////////////////////////////////////
+
+
+
+    elements[0] = function() {
+
+      var original, processed,                           // data sets passed in and then transformed
+
+        element, data,                                 // brunel element information and brunel data
+
+        selection, merged;                                      // d3 selection and merged selection
+
+      var elementGroup = interior.append('g').attr('class', 'element1'),
+
+        main = elementGroup.append('g').attr('class', 'main'),
+
+        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
+
+
+
+      function makeData() {
+
+        original = datasets[0];
+
+        if (filterRows) original = original.retainRows(filterRows);
+
+        processed = pre(original, 0);
+
+        processed = post(processed, 0);
+
+        var f0 = processed.field('carrier'),
+
+          f1 = processed.field('dest'),
+
+          f2 = processed.field('#row'),
+
+          f3 = processed.field('#selection');
+
+        var keyFunc = function(d) { return f2.value(d) };
+
+        data = {
+
+          carrier:      function(d) { return f0.value(d.row) },
+
+          dest:         function(d) { return f1.value(d.row) },
+
+          $row:         function(d) { return f2.value(d.row) },
+
+          $selection:   function(d) { return f3.value(d.row) },
+
+          carrier_f:    function(d) { return f0.valueFormatted(d.row) },
+
+          dest_f:       function(d) { return f1.valueFormatted(d.row) },
+
+          $row_f:       function(d) { return f2.valueFormatted(d.row) },
+
+          $selection_f: function(d) { return f3.valueFormatted(d.row) },
+
+          _split:       function(d) { return 'ALL' },
+
+          _key:         keyFunc,
+
+          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
+
+        };
+
+      }
+
+
+
+      // Build element from data ///////////////////////////////////////////////////////////////////
+
+
+
+      function build(transitionMillis) {
+
+        element = elements[0];
+
+        var w = 0.9 * Math.abs(scale_x(scale_x.domain()[1]) - scale_x(scale_x.domain()[0]) );
+
+        var x = function(d) { return scale_x(data.carrier(d))};
+
+        var h = 0.9 * Math.abs(scale_y(scale_y.domain()[1]) - scale_y(scale_y.domain()[0]) );
+
+        var y = function(d) { return scale_y(data.dest(d))};
+
+
+
+        // Define selection entry operations
+
+        function initialState(selection) {
+
+          selection
+
+            .attr('class', 'element point filled')
+
+        }
+
+
+
+        // Define selection update operations on merged data
+
+        function updateState(selection) {
+
+          selection
+
+            .each(function(d) {
+
+              var width = w, left = x(d) - width/2, 
+
+              height = h, top = y(d) - height/2;
+
+              this.r = {x:left, y:top, w:width, h:height};
+
+            })
+
+            .attr('x', function(d) { return this.r.x })
+
+            .attr('y', function(d) { return this.r.y })
+
+            .attr('width', function(d) { return this.r.w })
+
+            .attr('height', function(d) { return this.r.h });
+
+        }
+
+
+
+        // Define labeling for the selection
+
+        function label(selection, transitionMillis) {
+
+
+
+          var tooltipLabeling  = {
+
+            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
+
+            fit: true, granularity: 0,
+
+            content: function(d) {
+
               return d.row == null ? null : '<span class="title">carrier: </span>'
 			+ '<span class="field">' + data.carrier_f(d) + '</span>'
 			+ '<br/>'
 			+ '<span class="title">dest: </span>'
-			+ '<span class="field">' + data.dest_f(d) + '</span>'
-            }
-          };
-          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
-        }
-        // Create selections, set the initial state and transition updates
-        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
-        var added = selection.enter().append('rect');
-        merged = selection.merge(added);
-        initialState(added);
-        selection.filter(BrunelD3.hasData)
-          .classed('selected', BrunelD3.isSelected(data))
-          .filter(BrunelD3.isSelected(data)).raise();
-        updateState(BrunelD3.transition(merged, transitionMillis));
-        label(merged, transitionMillis);
-
-        BrunelD3.transition(selection.exit(), transitionMillis/3)
-          .style('opacity', 0.5).each( function() {
-            this.remove(); BrunelD3.removeLabels(this); 
-        });
-      }
-
-      return {
-        data:           function() { return processed },
-        original:       function() { return original },
-        internal:       function() { return data },
-        selection:      function() { return merged },
-        makeData:       makeData,
-        build:          build,
-        chart:          function() { return charts[0] },
-        group:          function() { return elementGroup },
-        fields: {
-          x:            ['carrier'],
-          y:            ['dest'],
-          key:          ['#row']
-        }
-      };
-    }();
-
-    function build(time, noData) {
-      var first = elements[0].data() == null;
-      if (first) time = 0;                                           // no transition for first call
-      buildAxes(time);
-      if ((first || time > -1) && !noData) {
-        elements[0].makeData();
-      }
-      elements[0].build(time);
-    }
-
-    // Expose the following components of the chart
-    return {
-      elements : elements,
-      interior : interior,
-      scales: {x:scale_x, y:scale_y},
-      zoom: function(params, time) {
-          if (params) zoom.on('zoom').call(zoomNode, params, time);
-          return d3.zoomTransform(zoomNode);
-      },
-      build : build
-    };
-    }();
-
-  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
-  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
-  function buildAll() {
-    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
-    updateAll(transitionTime);
-  }
-
-  return {
-    dataPreProcess:     function(f) { if (f) pre = f; return pre },
-    dataPostProcess:    function(f) { if (f) post = f; return post },
-    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
-    visId:              visId,
-    build:              buildAll,
-    rebuild:            updateAll,
-    charts:             charts
-  }
-}
-
-// Data Tables /////////////////////////////////////////////////////////////////////////////////////
-
-var table1 = {
-   summarized: false,
-   names: ['carrier', 'dest'], 
-   options: ['string', 'string'], 
-   rows: [['UA', 'IAH'], ['UA', 'IAH'], ['AA', 'MIA'], ['B6', 'BQN'], ['DL', 'ATL'], ['UA', 'ORD'],
-  ['B6', 'FLL'], ['EV', 'IAD'], ['B6', 'MCO'], ['AA', 'ORD'], ['B6', 'PBI'], ['B6', 'TPA'],
-  ['UA', 'LAX'], ['UA', 'SFO'], ['AA', 'DFW'], ['B6', 'BOS'], ['UA', 'LAS'], ['B6', 'FLL'],
-  ['MQ', 'ATL'], ['B6', 'PBI'], ['DL', 'MSP'], ['MQ', 'DTW'], ['AA', 'MIA'], ['DL', 'ATL'],
-  ['UA', 'MIA'], ['MQ', 'ORD'], ['UA', 'SFO'], ['B6', 'RSW'], ['B6', 'SJU'], ['DL', 'ATL'],
-  ['US', 'PHX'], ['AA', 'MIA'], ['UA', 'IAH'], ['EV', 'MSP'], ['MQ', 'MSP'], ['US', 'PHX'],
-  ['AA', 'SJU'], ['UA', 'LAX'], ['AA', 'ORD'], ['WN', 'BWI'], ['US', 'CLT'], ['EV', 'IAD'],
-  ['AA', 'DFW'], ['B6', 'MCO'], ['B6', 'BOS'], ['UA', 'PBI'], ['US', 'CLT'], ['UA', 'FLL'],
-  ['B6', 'BUF'], ['UA', 'DEN'], ['UA', 'SNA'], ['B6', 'LAS'], ['B6', 'MSY'], ['DL', 'PBI'],
-  ['DL', 'SLC'], ['DL', 'SFO'], ['DL', 'MIA'], ['AA', 'ORD'], ['AA', 'MCO'], ['MQ', 'XNA'],
-  ['UA', 'TPA'], ['DL', 'FLL'], ['DL', 'ATL'], ['VX', 'LAX'], ['AA', 'MIA'], ['B6', 'FLL'],
-  ['DL', 'DTW'], ['UA', 'RSW'], ['UA', 'SJU'], ['B6', 'LAX'], ['UA', 'ORD'], ['B6', 'SJU'],
-  ['AA', 'FLL'], ['UA', 'ORD'], ['FL', 'MKE'], ['B6', 'MCO'], ['UA', 'PBI'], ['AA', 'DFW'],
-  ['AS', 'SEA'], ['AA', 'DFW'], ['UA', 'DEN'], ['UA', 'IAH'], ['VX', 'SFO'], ['B6', 'ROC'],
-  ['B6', 'RSW'], ['UA', 'MCO'], ['B6', 'SYR'], ['B6', 'SFO'], ['AA', 'ORD'], ['UA', 'IAH'],
-  ['B6', 'TPA'], ['AA', 'LAX'], ['B6', 'SRQ'], ['DL', 'SEA'], ['AA', 'SFO'], ['UA', 'SFO'],
-  ['MQ', 'ORD'], ['DL', 'MCO'], ['UA', 'DEN'], ['US', 'CLT'], ['AA', 'MIA'], ['DL', 'ATL'],
-  ['WN', 'DEN'], ['B6', 'MCO'], ['DL', 'MIA'], ['DL', 'MSP'], ['MQ', 'RDU'], ['B6', 'BOS'],
-  ['AA', 'BOS'], ['UA', 'SFO'], ['DL', 'MCO'], ['B6', 'CLT'], ['B6', 'FLL'], ['MQ', 'CMH'],
-  ['DL', 'ATL'], ['EV', 'JAX'], ['9E', 'MSP'], ['DL', 'PBI'], ['EV', 'CHS'], ['MQ', 'CLT'],
-  ['US', 'CLT'], ['EV', 'MEM'], ['DL', 'DEN'], ['FL', 'ATL'], ['B6', 'PIT'], ['B6', 'SJU'],
-  ['DL', 'BOS'], ['DL', 'SJU'], ['B6', 'SAN'], ['MQ', 'DCA'], ['EV', 'CLE'], ['US', 'CLT'],
-  ['UA', 'DFW'], ['AA', 'STL'], ['B6', 'JAX'], ['AA', 'MIA'], ['UA', 'SFO'], ['B6', 'ORD'],
-  ['UA', 'LAX'], ['UA', 'LAX'], ['UA', 'MCO'], ['AA', 'ORD'], ['MQ', 'ATL'], ['EV', 'MYR'],
-  ['MQ', 'RDU'], ['F9', 'DEN'], ['AA', 'DFW'], ['MQ', 'CLE'], ['AA', 'SJU'], ['DL', 'DTW'],
-  ['B6', 'RSW'], ['MQ', 'BWI'], ['UA', 'JAC'], ['EV', 'RDU'], ['DL', 'DTW'], ['UA', 'SAN'],
-  ['WN', 'MDW'], ['B6', 'TPA'], ['DL', 'ATL'], ['AA', 'LAX'], ['DL', 'MIA'], ['UA', 'PBI'],
-  ['HA', 'HNL'], ['DL', 'DTW'], ['DL', 'ATL'], ['UA', 'SEA'], ['MQ', 'DTW'], ['DL', 'MCO'],
-  ['VX', 'LAX'], ['UA', 'FLL'], ['UA', 'ORD'], ['MQ', 'BNA'], ['UA', 'MIA'], ['B6', 'AUS'],
-  ['UA', 'DEN'], ['B6', 'BTV'], ['US', 'PHL'], ['UA', 'IAH'], ['AA', 'STT'], ['AA', 'MIA'],
-  ['UA', 'MIA'], ['UA', 'STT'], ['AA', 'DFW'], ['UA', 'CLE'], ['AA', 'DFW'], ['B6', 'MCO'],
-  ['B6', 'RDU'], ['B6', 'IAD'], ['MQ', 'CLT'], ['DL', 'LAX'], ['B6', 'BOS'], ['B6', 'SJU'],
-  ['B6', 'PBI'], ['UA', 'EGE'], ['DL', 'RSW'], ['EV', 'DCA'], ['WN', 'DEN'], ['UA', 'TPA'],
-  ['B6', 'FLL'], ['UA', 'ORD'], ['VX', 'LAS'], ['B6', 'BUF'], ['B6', 'FLL'], ['WN', 'MDW'],
-  ['DL', 'TPA'], ['DL', 'SRQ'], ['B6', 'PBI'], ['WN', 'MKE'], ['AA', 'ORD'], ['MQ', 'ATL'],
-  ['B6', 'LAX'], ['EV', 'AVL'], ['B6', 'PWM'], ['EV', 'STL'], ['MQ', 'BNA'], ['UA', 'LAX'],
-  ['US', 'PHX'], ['DL', 'ATL'], ['UA', 'BOS'], ['DL', 'FLL'], ['US', 'CLT'], ['B6', 'FLL'],
-  ['US', 'PHX'], ['UA', 'DEN'], ['MQ', 'ORD'], ['DL', 'MSP'], ['US', 'CLT'], ['US', 'CLT'],
-  ['EV', 'IAD'], ['DL', 'LAS'], ['FL', 'ATL'], ['EV', 'BUF'], ['MQ', 'RDU'], ['AA', 'DFW'],
-  ['UA', 'MCO'], ['AA', 'LAX'], ['UA', 'IAH'], ['AA', 'SFO'], ['EV', 'CHS'], ['VX', 'SFO'],
-  ['UA', 'FLL'], ['EV', 'IND'], ['UA', 'BOS'], ['AA', 'ORD'], ['UA', 'ORD'], ['B6', 'MCO'],
-  ['EV', 'MKE'], ['UA', 'IAH'], ['UA', 'RSW'], ['AA', 'DFW'], ['DL', 'SLC'], ['MQ', 'DTW'],
-  ['B6', 'FLL'], ['DL', 'ATL'], ['EV', 'PWM'], ['DL', 'TPA'], ['US', 'DCA'], ['WN', 'BWI'],
-  ['MQ', 'DCA'], ['UA', 'LAS'], ['B6', 'PBI'], ['DL', 'MIA'], ['UA', 'SFO'], ['MQ', 'CMH'],
-  ['AA', 'MIA'], ['B6', 'BTV'], ['UA', 'SFO'], ['DL', 'DTW'], ['UA', 'IAH'], ['EV', 'SAV'],
-  ['WN', 'STL'], ['UA', 'DEN'], ['B6', 'SFO'], ['DL', 'RSW'], ['US', 'CLT'], ['EV', 'RDU'],
-  ['UA', 'LAX'], ['UA', 'PBI'], ['UA', 'TPA'], ['AA', 'ORD'], ['DL', 'MSP'], ['MQ', 'CLE'],
-  ['B6', 'RSW'], ['VX', 'LAX'], ['AA', 'MIA'], ['DL', 'PBI'], ['UA', 'SNA'], ['EV', 'ATL'],
-  ['FL', 'CAK'], ['EV', 'SYR'], ['EV', 'CMH'], ['B6', 'FLL'], ['DL', 'LAX'], ['B6', 'BOS'],
-  ['MQ', 'ATL'], ['AA', 'LAX'], ['DL', 'FLL'], ['DL', 'ATL'], ['MQ', 'DCA'], ['EV', 'ROC'],
-  ['MQ', 'RDU'], ['UA', 'MCO'], ['AA', 'DFW'], ['WN', 'BWI'], ['UA', 'ORD'], ['US', 'CLT'],
-  ['EV', 'BTV'], ['UA', 'SJU'], ['EV', 'ATL'], ['VX', 'SFO'], ['B6', 'MCO'], ['UA', 'IAH'],
-  ['EV', 'BUF'], ['B6', 'HOU'], ['EV', 'CLT'], ['MQ', 'ORD'], ['UA', 'SFO'], ['AA', 'STL'],
-  ['DL', 'MSY'], ['WN', 'MDW'], ['EV', 'JAX'], ['B6', 'TPA'], ['UA', 'PHX'], ['EV', 'DTW'],
-  ['DL', 'DTW'], ['UA', 'FLL'], ['AA', 'BOS'], ['WN', 'MKE'], ['EV', 'DTW'], ['AA', 'MIA'],
-  ['MQ', 'RDU'], ['EV', 'DCA'], ['DL', 'SLC'], ['DL', 'SJU'], ['B6', 'BUF'], ['UA', 'IAH'],
-  ['B6', 'FLL'], ['AA', 'DFW'], ['UA', 'DEN'], ['DL', 'ATL'], ['WN', 'DEN'], ['MQ', 'BNA'],
-  ['US', 'CLT'], ['US', 'BOS'], ['B6', 'LGB'], ['MQ', 'CMH'], ['FL', 'ATL'], ['AA', 'ORD'],
-  ['AA', 'DFW'], ['MQ', 'MSP'], ['UA', 'DFW'], ['B6', 'BOS'], ['UA', 'MIA'], ['EV', 'DAY'],
-  ['B6', 'ROC'], ['MQ', 'DTW'], ['AA', 'MIA'], ['WN', 'HOU'], ['B6', 'PBI'], ['US', 'CLT'],
-  ['EV', 'ALB'], ['EV', 'BWI'], ['MQ', 'RDU'], ['EV', 'BDL'], ['B6', 'MCO'], ['UA', 'LAX'],
-  ['DL', 'SLC'], ['DL', 'ATL'], ['VX', 'LAX'], ['UA', 'FLL'], ['EV', 'IND'], ['B6', 'JAX'],
-  ['EV', 'PIT'], ['B6', 'LAX'], ['AA', 'MIA'], ['B6', 'SRQ'], ['AA', 'LAX'], ['EV', 'STL'],
-  ['AA', 'DFW'], ['UA', 'HNL'], ['WN', 'PHX'], ['EV', 'BUF'], ['B6', 'PWM'], ['EV', 'MHT'],
-  ['EV', 'MSN'], ['EV', 'CHS'], ['DL', 'BOS'], ['EV', 'GSO'], ['B6', 'MCO'], ['WN', 'MDW'],
-  ['MQ', 'CLT'], ['UA', 'ORD'], ['UA', 'ORD'], ['UA', 'IAH'], ['US', 'PHX'], ['EV', 'MEM'],
-  ['DL', 'ATL'], ['EV', 'MEM'], ['FL', 'ATL'], ['B6', 'FLL'], ['UA', 'ORD'], ['UA', 'SEA'],
-  ['MQ', 'ORD'], ['B6', 'BOS'], ['B6', 'SEA'], ['DL', 'RSW'], ['MQ', 'CLE'], ['UA', 'SFO'],
-  ['EV', 'IAD'], ['EV', 'CVG'], ['EV', 'ATL'], ['B6', 'BUR'], ['UA', 'PBI'], ['UA', 'IAH'],
-  ['B6', 'PBI'], ['UA', 'CLE'], ['DL', 'MSP'], ['DL', 'SFO'], ['DL', 'DCA'], ['DL', 'DTW'],
-  ['AA', 'MCO'], ['EV', 'IAD'], ['AA', 'ORD'], ['MQ', 'ATL'], ['AA', 'MIA'], ['US', 'CLT'],
-  ['MQ', 'RDU'], ['9E', 'IAD'], ['9E', 'BUF'], ['B6', 'FLL'], ['MQ', 'CLE'], ['US', 'DCA'],
-  ['EV', 'PWM'], ['9E', 'SYR'], ['DL', 'LAX'], ['B6', 'MSY'], ['B6', 'PIT'], ['DL', 'PBI'],
-  ['UA', 'ORD'], ['UA', 'AUS'], ['UA', 'RSW'], ['US', 'CLT'], ['MQ', 'CMH'], ['EV', 'CMH'],
-  ['UA', 'TPA'], ['B6', 'FLL'], ['UA', 'FLL'], ['EV', 'RIC'], ['MQ', 'RDU'], ['AA', 'DFW'],
-  ['UA', 'DEN'], ['9E', 'ROC'], ['MQ', 'IND'], ['UA', 'MCO'], ['B6', 'TPA'], ['DL', 'ATL'],
-  ['DL', 'BUF'], ['B6', 'MCO'], ['EV', 'CLT'], ['MQ', 'PIT'], ['B6', 'SRQ'], ['UA', 'SFO'],
-  ['AA', 'DFW'], ['MQ', 'DCA'], ['UA', 'MCO'], ['DL', 'MCO'], ['MQ', 'CMH'], ['UA', 'LAX'],
-  ['UA', 'LAX'], ['B6', 'PBI'], ['B6', 'MCO'], ['MQ', 'XNA'], ['WN', 'MDW'], ['AA', 'FLL'],
-  ['B6', 'BUF'], ['B6', 'RSW'], ['UA', 'IAH'], ['EV', 'STL'], ['AA', 'STL'], ['UA', 'ORD'],
-  ['US', 'CLT'], ['9E', 'BWI'], ['EV', 'DCA'], ['EV', 'GSP'], ['UA', 'DEN'], ['EV', 'GRR'],
-  ['WN', 'MKE'], ['DL', 'MCO'], ['AA', 'SFO'], ['AA', 'LAX'], ['UA', 'LAS'], ['B6', 'SJU'],
-  ['DL', 'SAN'], ['DL', 'SLC'], ['UA', 'CLE'], ['9E', 'ORD'], ['DL', 'ATL'], ['MQ', 'MSP'],
-  ['EV', 'MCI'], ['UA', 'MIA'], ['9E', 'IND'], ['EV', 'IAD'], ['FL', 'ATL'], ['9E', 'BNA'],
-  ['AA', 'DFW'], ['9E', 'BOS'], ['DL', 'ATL'], ['MQ', 'CVG'], ['EV', 'PIT'], ['DL', 'RSW'],
-  ['UA', 'ORD'], ['EV', 'BNA'], ['EV', 'IAD'], ['B6', 'FLL'], ['DL', 'LAS'], ['9E', 'PHL'],
-  ['UA', 'ORD'], ['DL', 'MCI'], ['EV', 'BUF'], ['B6', 'ORD'], ['WN', 'DEN'], ['MQ', 'RDU'],
-  ['UA', 'FLL'], ['MQ', 'CLT'], ['AA', 'ORD'], ['B6', 'SYR'], ['UA', 'BOS'], ['AA', 'DFW'],
-  ['AA', 'MIA'], ['B6', 'MCO'], ['DL', 'FLL'], ['DL', 'MSP'], ['DL', 'DEN'], ['UA', 'PHX'],
-  ['EV', 'PIT'], ['MQ', 'ATL'], ['UA', 'IAH'], ['DL', 'ATL'], ['US', 'PHX'], ['AA', 'SJU'],
-  ['B6', 'LAX'], ['DL', 'DTW'], ['B6', 'TPA'], ['VX', 'SFO'], ['EV', 'IAD'], ['DL', 'DEN'],
-  ['EV', 'CVG'], ['B6', 'PBI'], ['EV', 'DCA'], ['US', 'PHX'], ['UA', 'SAN'], ['WN', 'STL'],
-  ['MQ', 'ORD'], ['UA', 'DEN'], ['UA', 'CLE'], ['B6', 'BOS'], ['9E', 'MSP'], ['EV', 'MKE'],
-  ['MQ', 'DTW'], ['AA', 'BOS'], ['UA', 'RSW'], ['EV', 'GSO'], ['EV', 'ATL'], ['B6', 'TPA'],
-  ['B6', 'SAN'], ['AA', 'DFW'], ['DL', 'FLL'], ['EV', 'MHT'], ['DL', 'AUS'], ['EV', 'ALB'],
-  ['AA', 'EGE'], ['DL', 'SFO'], ['VX', 'LAX'], ['AA', 'LAS'], ['WN', 'STL'], ['UA', 'MCO'],
-  ['MQ', 'ORF'], ['AA', 'AUS'], ['UA', 'ORD'], ['UA', 'IAH'], ['AA', 'DFW'], ['US', 'CLT'],
-  ['DL', 'ATL'], ['UA', 'LAX'], ['WN', 'HOU'], ['EV', 'BTV'], ['B6', 'CLT'], ['B6', 'PBI'],
-  ['UA', 'DEN'], ['UA', 'SAT'], ['B6', 'FLL'], ['AA', 'ORD'], ['F9', 'DEN'], ['B6', 'SJU'],
-  ['UA', 'ORD'], ['AA', 'ORD'], ['B6', 'SJU'], ['MQ', 'RDU'], ['DL', 'LAX'], ['US', 'CLT'],
-  ['UA', 'IAH'], ['AA', 'MIA'], ['UA', 'SFO'], ['AA', 'SAN'], ['EV', 'SDF'], ['UA', 'SFO'],
-  ['FL', 'ATL'], ['B6', 'PHX'], ['UA', 'SEA'], ['EV', 'DAY'], ['B6', 'RSW'], ['B6', 'PBI'],
-  ['DL', 'DTW'], ['DL', 'PDX'], ['DL', 'MIA'], ['MQ', 'XNA'], ['DL', 'MCO'], ['9E', 'RDU'],
-  ['B6', 'MCO'], ['B6', 'TPA'], ['DL', 'TPA'], ['WN', 'MDW'], ['B6', 'IAD'], ['UA', 'LAX'],
-  ['B6', 'MCO'], ['WN', 'MDW'], ['B6', 'MCO'], ['UA', 'MCO'], ['EV', 'DCA'], ['DL', 'ATL'],
-  ['B6', 'BOS'], ['B6', 'FLL'], ['UA', 'ORD'], ['EV', 'CMH'], ['B6', 'RDU'], ['UA', 'CLE'],
-  ['DL', 'BUF'], ['UA', 'LAX'], ['EV', 'DTW'], ['MQ', 'BNA'], ['US', 'CLT'], ['UA', 'PDX'],
-  ['MQ', 'BNA'], ['UA', 'SAN'], ['AS', 'SEA'], ['B6', 'LGB'], ['UA', 'DFW'], ['EV', 'STL'],
-  ['B6', 'SJC'], ['EV', 'OMA'], ['WN', 'BWI'], ['MQ', 'CMH'], ['UA', 'LAS'], ['AA', 'ORD'],
-  ['AA', 'LAX'], ['DL', 'MSP'], ['AA', 'SEA'], ['9E', 'DTW'], ['US', 'CLT'], ['AA', 'MIA'],
-  ['DL', 'SEA'], ['UA', 'DEN'], ['EV', 'CLE'], ['UA', 'PBI'], ['EV', 'PWM'], ['9E', 'CHS'],
-  ['UA', 'SNA'], ['MQ', 'ORD'], ['UA', 'ORD'], ['EV', 'CVG'], ['B6', 'BUF'], ['MQ', 'CRW'],
-  ['UA', 'SFO'], ['EV', 'BTV'], ['UA', 'FLL'], ['AA', 'STL'], ['DL', 'BOS'], ['DL', 'SJU'],
-  ['AA', 'DFW'], ['AA', 'SJU'], ['AA', 'SFO'], ['FL', 'ATL'], ['EV', 'IAD'], ['9E', 'MSY'],
-  ['VX', 'SFO'], ['US', 'DCA'], ['MQ', 'CLE'], ['DL', 'ATL'], ['UA', 'IAH'], ['AA', 'LAX'],
-  ['B6', 'MCO'], ['DL', 'ATL'], ['WN', 'MKE'], ['EV', 'RIC'], ['DL', 'MIA'], ['B6', 'OAK'],
-  ['DL', 'MCO'], ['UA', 'TPA'], ['DL', 'SFO'], ['DL', 'TPA'], ['B6', 'SLC'], ['DL', 'LAS'],
-  ['EV', 'BNA'], ['9E', 'ORD'], ['US', 'CLT'], ['MQ', 'RDU'], ['DL', 'MCO'], ['UA', 'PHX'],
-  ['DL', 'SLC'], ['UA', 'SFO'], ['AA', 'ORD'], ['EV', 'CLT'], ['DL', 'PHX'], ['EV', 'GRR'],
-  ['B6', 'SMF'], ['EV', 'IAD'], ['DL', 'LAX'], ['AA', 'DFW'], ['9E', 'RDU'], ['UA', 'BQN'],
-  ['DL', 'SAN'], ['MQ', 'BNA'], ['EV', 'OMA'], ['AA', 'LAX'], ['EV', 'RIC'], ['9E', 'DFW'],
-  ['AA', 'TPA'], ['UA', 'BOS'], ['B6', 'FLL'], ['MQ', 'DCA'], ['9E', 'JAX'], ['EV', 'CHS'],
-  ['B6', 'LAS'], ['EV', 'TUL'], ['VX', 'LAX'], ['UA', 'SEA'], ['9E', 'PIT'], ['9E', 'BWI'],
-  ['B6', 'SFO'], ['UA', 'DFW'], ['DL', 'SAT'], ['UA', 'IAH'], ['EV', 'TYS'], ['9E', 'PHL'],
-  ['AA', 'MIA'], ['UA', 'MIA'], ['EV', 'SAV'], ['UA', 'ORD'], ['MQ', 'MSP'], ['MQ', 'CMH'],
-  ['EV', 'PIT'], ['UA', 'CLE'], ['AA', 'BOS'], ['9E', 'BUF'], ['EV', 'OKC'], ['MQ', 'CMH'],
-  ['9E', 'CLE'], ['B6', 'FLL'], ['UA', 'RSW'], ['FL', 'CAK'], ['B6', 'AUS'], ['9E', 'CVG'],
-  ['B6', 'BUR'], ['DL', 'FLL'], ['UA', 'AUS'], ['EV', 'MKE'], ['B6', 'PBI'], ['WN', 'MDW'],
-  ['EV', 'MHT'], ['AA', 'ORD'], ['B6', 'HOU'], ['B6', 'MSY'], ['UA', 'IAH'], ['UA', 'BOS'],
-  ['UA', 'LAX'], ['EV', 'RDU'], ['B6', 'JAX'], ['9E', 'DCA'], ['UA', 'MCO'], ['MQ', 'RDU'],
-  ['B6', 'PDX'], ['B6', 'RSW'], ['MQ', 'DTW'], ['UA', 'PBI'], ['EV', 'ALB'], ['EV', 'IAD'],
-  ['B6', 'MCO'], ['MQ', 'RDU'], ['MQ', 'ORD'], ['EV', 'SDF'], ['WN', 'MDW'], ['UA', 'TPA'],
-  ['MQ', 'CLT'], ['B6', 'BOS'], ['UA', 'SJU'], ['DL', 'LAS'], ['B6', 'LAX'], ['UA', 'SFO'],
-  ['B6', 'MCO'], ['MQ', 'ATL'], ['EV', 'RIC'], ['9E', 'CVG'], ['EV', 'PVD'], ['EV', 'DSM'],
-  ['B6', 'FLL'], ['B6', 'MCO'], ['MQ', 'BNA'], ['AA', 'LAX'], ['MQ', 'DCA'], ['B6', 'DEN'],
-  ['UA', 'FLL'], ['B6', 'FLL'], ['B6', 'SJU'], ['B6', 'MCO'], ['EV', 'BWI'], ['AA', 'MIA'],
-  ['B6', 'PBI'], ['B6', 'RDU'], ['B6', 'BUF'], ['B6', 'SJU'], ['B6', 'TPA'], ['EV', 'BUF'],
-  ['EV', 'PWM'], ['B6', 'FLL'], ['B6', 'PWM'], ['B6', 'BOS'], ['EV', 'BDL'], ['B6', 'ROC'],
-  ['B6', 'BTV'], ['B6', 'BUF'], ['EV', 'DCA'], ['EV', 'BTV'], ['B6', 'LAS'], ['B6', 'SYR'],
-  ['EV', 'MCI'], ['B6', 'PSE'], ['B6', 'SJU'], ['B6', 'BQN'], ['EV', 'RDU'], ['AA', 'DFW'],
-  ['AA', 'MIA'], ['B6', 'FLL'], ['B6', 'SJU'], ['B6', 'SYR'], ['US', 'CLT'], ['UA', 'IAH'],
-  ['AA', 'MIA'], ['UA', 'IAH'], ['B6', 'BQN'], ['B6', 'FLL'], ['B6', 'PBI'], ['B6', 'FLL'],
-  ['AA', 'DFW'], ['B6', 'TPA'], ['DL', 'DTW'], ['EV', 'IAD'], ['DL', 'ATL'], ['DL', 'CVG'],
-  ['FL', 'ATL'], ['UA', 'SFO'], ['UA', 'LAS'], ['UA', 'MIA'], ['EV', 'CMH'], ['EV', 'MSP'],
-  ['9E', 'CVG'], ['B6', 'MCO'], ['WN', 'MDW'], ['MQ', 'DTW'], ['UA', 'ORD'], ['US', 'PHL'],
-  ['AA', 'ORD'], ['UA', 'LAX'], ['UA', 'SFO'], ['DL', 'ATL'], ['DL', 'MSP'], ['AA', 'MIA'],
-  ['B6', 'FLL'], ['EV', 'MEM'], ['DL', 'ATL'], ['WN', 'MDW'], ['B6', 'PBI'], ['B6', 'SJU'],
-  ['UA', 'LAX'], ['US', 'CLT'], ['AA', 'MIA'], ['MQ', 'MSP'], ['MQ', 'ATL'], ['MQ', 'CLT'],
-  ['UA', 'IAH'], ['UA', 'DFW'], ['US', 'CLT'], ['DL', 'TPA'], ['WN', 'BWI'], ['EV', 'IAD'],
-  ['EV', 'CVG'], ['US', 'PHX'], ['B6', 'RSW'], ['DL', 'FLL'], ['WN', 'BWI'], ['EV', 'RDU'],
-  ['UA', 'LAX'], ['AA', 'ORD'], ['UA', 'AUS'], ['UA', 'PHX'], ['EV', 'BNA'], ['US', 'PHX'],
-  ['UA', 'CLE'], ['B6', 'BOS'], ['UA', 'PBI'], ['EV', 'ATL'], ['AA', 'DFW'], ['B6', 'BUF'],
-  ['B6', 'MCO'], ['US', 'CLT'], ['UA', 'DEN'], ['UA', 'BOS'], ['US', 'CLT'], ['DL', 'SLC'],
-  ['UA', 'MCO'], ['DL', 'SFO'], ['UA', 'FLL'], ['AA', 'MCO'], ['B6', 'LAS'], ['DL', 'LAX'],
-  ['DL', 'PBI'], ['DL', 'MIA'], ['B6', 'FLL'], ['MQ', 'XNA'], ['US', 'DCA'], ['VX', 'LAX'],
-  ['EV', 'CLT'], ['AA', 'ORD'], ['AA', 'MIA'], ['DL', 'MSY'], ['UA', 'TPA'], ['B6', 'MSY'],
-  ['DL', 'DTW'], ['UA', 'SJU'], ['AA', 'SJU'], ['MQ', 'ORD'], ['AA', 'MIA'], ['B6', 'LAX'],
-  ['DL', 'ATL'], ['UA', 'ORD'], ['AA', 'FLL'], ['B6', 'MCO'], ['UA', 'SFO'], ['UA', 'RSW'],
-  ['MQ', 'ORD'], ['AS', 'SEA'], ['UA', 'ORD'], ['VX', 'SFO'], ['UA', 'SNA'], ['UA', 'DEN'],
-  ['FL', 'MKE'], ['B6', 'RSW'], ['DL', 'SEA'], ['B6', 'SJU'], ['AA', 'LAX'], ['B6', 'SYR'],
-  ['UA', 'IAH'], ['B6', 'ROC'], ['B6', 'SFO'], ['WN', 'HOU'], ['UA', 'BOS'], ['B6', 'TPA'],
-  ['AA', 'ORD'], ['AA', 'SFO'], ['UA', 'MCO'], ['WN', 'DEN'], ['EV', 'GSO'], ['UA', 'DEN'],
-  ['9E', 'PHL'], ['DL', 'ATL'], ['AA', 'DFW'], ['UA', 'SFO'], ['B6', 'SRQ'], ['UA', 'PBI'],
-  ['9E', 'PIT'], ['EV', 'GSP'], ['EV', 'BTV'], ['UA', 'IAH'], ['EV', 'DCA'], ['DL', 'MCO'],
-  ['B6', 'MCO'], ['B6', 'FLL'], ['DL', 'ATL'], ['DL', 'MIA'], ['US', 'CLT'], ['AA', 'MIA'],
-  ['B6', 'BOS'], ['DL', 'MCO'], ['AA', 'DFW'], ['MQ', 'RDU'], ['UA', 'PDX'], ['AA', 'STT'],
-  ['DL', 'FLL'], ['DL', 'ATL'], ['US', 'CLT'], ['B6', 'PIT'], ['DL', 'MSP'], ['DL', 'DEN'],
-  ['DL', 'TPA'], ['MQ', 'BNA'], ['DL', 'PBI'], ['MQ', 'CMH'], ['MQ', 'DCA'], ['EV', 'IND'],
-  ['9E', 'ORD'], ['AA', 'BOS'], ['B6', 'CLT'], ['B6', 'SAN'], ['DL', 'LAS'], ['B6', 'JAX'],
-  ['B6', 'SJU'], ['UA', 'DFW'], ['UA', 'LAX'], ['FL', 'ATL'], ['AA', 'ORD'], ['DL', 'RSW'],
-  ['AA', 'STL'], ['DL', 'MSP'], ['EV', 'OMA'], ['F9', 'DEN'], ['DL', 'SJU'], ['MQ', 'ATL'],
-  ['EV', 'ORF'], ['9E', 'DCA'], ['B6', 'ORD'], ['EV', 'ROC'], ['AA', 'DFW'], ['UA', 'LAX'],
-  ['UA', 'ORD'], ['EV', 'DAY'], ['WN', 'PHX'], ['EV', 'MSP'], ['9E', 'RDU'], ['AA', 'SJU'],
-  ['MQ', 'RDU'], ['UA', 'SFO'], ['EV', 'SYR'], ['9E', 'BUF'], ['MQ', 'CLE'], ['9E', 'DTW'],
-  ['B6', 'TPA'], ['UA', 'DEN'], ['EV', 'CHS'], ['9E', 'MSP'], ['B6', 'RSW'], ['UA', 'SAN'],
-  ['EV', 'MEM'], ['UA', 'SEA'], ['AA', 'LAX'], ['WN', 'MDW'], ['DL', 'DTW'], ['DL', 'LAX'],
-  ['MQ', 'DTW'], ['AA', 'MIA'], ['DL', 'ATL'], ['DL', 'ATL'], ['DL', 'MIA'], ['UA', 'SFO'],
-  ['EV', 'RIC'], ['UA', 'LAX'], ['UA', 'CLE'], ['UA', 'IAH'], ['DL', 'MCO'], ['UA', 'JAC'],
-  ['UA', 'ORD'], ['VX', 'LAX'], ['B6', 'BTV'], ['EV', 'XNA'], ['B6', 'FLL'], ['HA', 'HNL'],
-  ['US', 'CLT'], ['DL', 'DTW'], ['B6', 'IAD'], ['UA', 'IAH'], ['MQ', 'CLT'], ['UA', 'STT'],
-  ['B6', 'BOS'], ['EV', 'GRR'], ['AA', 'DFW'], ['AA', 'DFW'], ['EV', 'PIT'], ['B6', 'SJU'],
-  ['B6', 'RDU'], ['B6', 'FLL'], ['VX', 'LAS'], ['EV', 'JAX'], ['B6', 'AUS'], ['UA', 'TPA'],
-  ['US', 'CLT'], ['DL', 'SRQ'], ['UA', 'EGE'], ['UA', 'PBI'], ['WN', 'DEN'], ['DL', 'TPA'],
-  ['UA', 'FLL'], ['B6', 'BUF'], ['WN', 'MKE'], ['EV', 'PWM'], ['B6', 'PBI'], ['B6', 'PBI'],
-  ['EV', 'MHT'], ['EV', 'DCA'], ['AA', 'ORD'], ['MQ', 'ATL'], ['EV', 'RDU'], ['B6', 'PWM'],
-  ['9E', 'ROC'], ['EV', 'IAD'], ['WN', 'MDW'], ['DL', 'SFO'], ['EV', 'STL'], ['UA', 'MCO'],
-  ['DL', 'FLL'], ['B6', 'FLL'], ['US', 'PHX'], ['EV', 'SAV'], ['9E', 'BWI'], ['B6', 'LAX'],
-  ['UA', 'DEN'], ['US', 'CLT'], ['US', 'CLT'], ['MQ', 'ORD'], ['US', 'CLT'], ['DL', 'LAS'],
-  ['FL', 'ATL'], ['US', 'PHX'], ['DL', 'ATL'], ['AA', 'DFW'], ['EV', 'CHS'], ['B6', 'BOS'],
-  ['DL', 'MSP'], ['MQ', 'RDU'], ['UA', 'IAH'], ['DL', 'ATL'], ['VX', 'SFO'], ['EV', 'BUF'],
-  ['UA', 'BOS'], ['EV', 'AVL'], ['B6', 'MCO'], ['UA', 'FLL'], ['EV', 'IND'], ['AA', 'LAX'],
-  ['MQ', 'DTW'], ['B6', 'PBI'], ['DL', 'MEM'], ['UA', 'ORD'], ['B6', 'FLL'], ['MQ', 'BNA'],
-  ['DL', 'SLC'], ['UA', 'SFO'], ['UA', 'RSW'], ['AA', 'DFW'], ['DL', 'MCO'], ['US', 'BOS'],
-  ['B6', 'MCO'], ['DL', 'ATL'], ['MQ', 'DCA'], ['UA', 'LAS'], ['US', 'DCA'], ['UA', 'PBI'],
-  ['B6', 'SFO'], ['UA', 'IAH'], ['UA', 'SFO'], ['WN', 'BWI'], ['AA', 'MIA'], ['B6', 'BTV'],
-  ['DL', 'DTW'], ['MQ', 'CMH'], ['AA', 'ORD'], ['DL', 'MIA'], ['EV', 'PIT'], ['DL', 'MCO'],
-  ['UA', 'DEN'], ['AA', 'ORD'], ['US', 'CLT'], ['EV', 'DTW'], ['9E', 'GRR'], ['UA', 'LAX'],
-  ['DL', 'RSW'], ['WN', 'STL'], ['B6', 'RSW'], ['UA', 'TPA'], ['UA', 'SJU'], ['VX', 'LAX'],
-  ['B6', 'FLL'], ['DL', 'PBI'], ['AA', 'MIA'], ['DL', 'ATL'], ['UA', 'SNA'], ['DL', 'MSP'],
-  ['MQ', 'MSP'], ['FL', 'CAK'], ['DL', 'TPA'], ['MQ', 'DCA'], ['AA', 'DFW'], ['B6', 'MCO'],
-  ['B6', 'HOU'], ['DL', 'LAX'], ['MQ', 'ATL'], ['UA', 'BOS'], ['B6', 'BOS'], ['DL', 'MSY'],
-  ['EV', 'RDU'], ['DL', 'FLL'], ['US', 'CLT'], ['WN', 'STL'], ['UA', 'IAH'], ['VX', 'SFO'],
-  ['MQ', 'CLE'], ['AA', 'LAX'], ['EV', 'PWM'], ['MQ', 'RDU'], ['EV', 'BUF'], ['UA', 'MCO'],
-  ['EV', 'ATL'], ['UA', 'DEN'], ['AA', 'STL'], ['B6', 'LAX'], ['MQ', 'ORD'], ['B6', 'TPA'],
-  ['UA', 'SFO'], ['EV', 'BTV'], ['EV', 'MKE'], ['EV', 'DAY'], ['EV', 'JAX'], ['EV', 'DTW'],
-  ['MQ', 'RDU'], ['B6', 'BUF'], ['UA', 'PHX'], ['DL', 'DTW'], ['WN', 'MKE'], ['MQ', 'BNA'],
-  ['EV', 'CMH'], ['WN', 'BWI'], ['AA', 'MIA'], ['AA', 'DFW'], ['DL', 'SLC'], ['EV', 'DTW'],
-  ['EV', 'MYR'], ['DL', 'SJU'], ['AA', 'DFW'], ['B6', 'LGB'], ['AA', 'BOS'], ['UA', 'IAH'],
-  ['9E', 'CVG'], ['DL', 'ATL'], ['US', 'CLT'], ['B6', 'FLL'], ['DL', 'CVG'], ['WN', 'MDW'],
-  ['EV', 'DCA'], ['DL', 'ATL'], ['UA', 'DFW'], ['WN', 'DEN'], ['MQ', 'CMH'], ['UA', 'MIA'],
-  ['UA', 'ORD'], ['B6', 'PBI'], ['B6', 'BOS'], ['AA', 'ORD'], ['FL', 'ATL'], ['US', 'CLT'],
-  ['EV', 'GSO'], ['B6', 'MCO'], ['UA', 'LAX'], ['WN', 'HOU'], ['MQ', 'RDU'], ['B6', 'FLL'],
-  ['DL', 'ATL'], ['VX', 'LAX'], ['EV', 'BUF'], ['B6', 'BUR'], ['EV', 'ROC'], ['B6', 'SJU'],
-  ['EV', 'MCI'], ['EV', 'ALB'], ['B6', 'ROC'], ['EV', 'BDL'], ['B6', 'MCO'], ['EV', 'OMA'],
-  ['B6', 'JAX'], ['B6', 'SRQ'], ['UA', 'FLL'], ['EV', 'CLT'], ['EV', 'STL'], ['AA', 'LAX'],
-  ['DL', 'ATL'], ['AA', 'MIA'], ['DL', 'MCO'], ['UA', 'HNL'], ['AA', 'MIA'], ['MQ', 'CLT'],
-  ['US', 'PHX'], ['WN', 'MDW'], ['EV', 'RIC'], ['B6', 'SEA'], ['B6', 'MCO'], ['UA', 'IAH'],
-  ['EV', 'IAD'], ['B6', 'PWM'], ['MQ', 'DTW'], ['EV', 'CHS'], ['DL', 'BOS'], ['FL', 'ATL'],
-  ['DL', 'MIA'], ['MQ', 'ORD'], ['UA', 'MCO'], ['UA', 'SFO'], ['MQ', 'MSP'], ['EV', 'BWI'],
-  ['EV', 'MSN'], ['UA', 'ORD'], ['UA', 'PBI'], ['DL', 'ATL'], ['DL', 'FLL'], ['EV', 'IAD'],
-  ['DL', 'SFO'], ['WN', 'PHX'], ['UA', 'IAH'], ['UA', 'CLE'], ['B6', 'SRQ'], ['EV', 'MEM'],
-  ['B6', 'PBI'], ['DL', 'RSW'], ['DL', 'MSP'], ['DL', 'DCA'], ['US', 'CLT'], ['B6', 'BUF'],
-  ['9E', 'BUF'], ['MQ', 'CLE'], ['9E', 'CLT'], ['B6', 'PBI'], ['DL', 'DTW'], ['UA', 'FLL'],
-  ['B6', 'MSY'], ['B6', 'FLL'], ['UA', 'TPA'], ['DL', 'MCI'], ['EV', 'STL'], ['AA', 'MIA'],
-  ['B6', 'BOS'], ['DL', 'PBI'], ['US', 'DCA'], ['B6', 'PIT'], ['UA', 'MCO'], ['9E', 'ORF'],
-  ['AA', 'ORD'], ['MQ', 'ATL'], ['US', 'CLT'], ['DL', 'ATL'], ['MQ', 'CMH'], ['DL', 'LAX'],
-  ['UA', 'SEA'], ['US', 'BOS'], ['AA', 'DFW'], ['UA', 'BOS'], ['AA', 'MIA'], ['B6', 'TPA'],
-  ['MQ', 'IND'], ['9E', 'IAD'], ['B6', 'TPA'], ['UA', 'AUS'], ['EV', 'BTV'], ['EV', 'GSP'],
-  ['UA', 'ORD'], ['WN', 'MKE'], ['AA', 'STL'], ['AA', 'DFW'], ['MQ', 'CLE'], ['UA', 'LAX'],
-  ['UA', 'IAH'], ['UA', 'DEN'], ['9E', 'BWI'], ['DL', 'DEN'], ['9E', 'RIC'], ['MQ', 'DCA'],
-  ['UA', 'LAX'], ['B6', 'MCO'], ['US', 'CLT'], ['9E', 'SYR'], ['MQ', 'CLT'], ['MQ', 'RDU'],
-  ['EV', 'CVG'], ['AA', 'FLL'], ['MQ', 'PIT'], ['UA', 'LAS'], ['AA', 'SFO'], ['B6', 'FLL'],
-  ['DL', 'TPA'], ['MQ', 'XNA'], ['MQ', 'RDU'], ['UA', 'MCO'], ['9E', 'ROC'], ['MQ', 'CMH'],
-  ['DL', 'MCO'], ['B6', 'SJU'], ['DL', 'MCO'], ['9E', 'ORD'], ['AA', 'DFW'], ['DL', 'ATL'],
-  ['9E', 'MSP'], ['UA', 'CLE'], ['UA', 'RSW'], ['EV', 'PIT'], ['B6', 'RSW'], ['B6', 'ORD'],
-  ['DL', 'SAN'], ['DL', 'SLC'], ['DL', 'ATL'], ['EV', 'ROC'], ['DL', 'PDX'], ['AA', 'MIA'],
-  ['EV', 'MCI'], ['B6', 'PBI'], ['DL', 'RSW'], ['UA', 'FLL'], ['AA', 'DFW'], ['B6', 'FLL'],
-  ['UA', 'MIA'], ['FL', 'ATL'], ['MQ', 'CVG'], ['UA', 'ORD'], ['EV', 'CMH'], ['9E', 'BNA'],
-  ['UA', 'BOS'], ['9E', 'BOS'], ['EV', 'GRR'], ['DL', 'LAS'], ['DL', 'MEM'], ['EV', 'MKE'],
-  ['MQ', 'RDU'], ['B6', 'SYR'], ['DL', 'FLL'], ['DL', 'ATL'], ['UA', 'PHX'], ['9E', 'PHL'],
-  ['AA', 'SFO'], ['EV', 'DCA'], ['AA', 'SJU'], ['B6', 'MCO'], ['EV', 'IAD'], ['9E', 'RDU'],
-  ['B6', 'TPA'], ['MQ', 'BNA'], ['9E', 'IND'], ['WN', 'DEN'], ['AA', 'ORD'], ['UA', 'SFO'],
-  ['UA', 'IAH'], ['9E', 'MEM'], ['DL', 'DTW'], ['UA', 'RSW'], ['EV', 'IAD'], ['DL', 'SEA'],
-  ['B6', 'LAX'], ['DL', 'DTW'], ['UA', 'CLE'], ['DL', 'MSP'], ['VX', 'SFO'], ['DL', 'DEN'],
-  ['UA', 'SAN'], ['WN', 'STL'], ['US', 'PHX'], ['EV', 'SDF'], ['B6', 'RSW'], ['DL', 'MIA'],
-  ['AA', 'DFW'], ['EV', 'PWM'], ['MQ', 'ORD'], ['UA', 'MCO'], ['UA', 'DEN'], ['AA', 'BOS'],
-  ['B6', 'CLT'], ['UA', 'SAT'], ['B6', 'BOS'], ['DL', 'SFO'], ['DL', 'CVG'], ['VX', 'LAX'],
-  ['DL', 'AUS'], ['9E', 'CVG'], ['WN', 'STL'], ['AA', 'LAS'], ['B6', 'PBI'], ['MQ', 'DTW'],
-  ['B6', 'SAN'], ['UA', 'ORD'], ['EV', 'SAV'], ['AA', 'EGE'], ['US', 'CLT'], ['AA', 'DFW'],
-  ['UA', 'IAH'], ['EV', 'BNA'], ['UA', 'DEN'], ['UA', 'LAX'], ['EV', 'ATL'], ['WN', 'MDW'],
-  ['B6', 'TPA'], ['MQ', 'ORF'], ['AA', 'AUS'], ['AA', 'LAX'], ['AA', 'ORD'], ['MQ', 'BNA'],
-  ['FL', 'ATL'], ['DL', 'FLL'], ['DL', 'ATL'], ['DL', 'SLC'], ['DL', 'LAX'], ['AA', 'MIA'],
-  ['UA', 'PDX'], ['US', 'CLT'], ['EV', 'DCA'], ['EV', 'IAD'], ['F9', 'DEN'], ['UA', 'DFW'],
-  ['DL', 'ATL'], ['UA', 'IAH'], ['UA', 'SFO'], ['B6', 'BTV'], ['MQ', 'ATL'], ['AA', 'SAN'],
-  ['UA', 'SAN'], ['EV', 'CVG'], ['AA', 'ORD'], ['DL', 'PDX'], ['DL', 'SAN'], ['EV', 'DTW'],
-  ['MQ', 'XNA'], ['UA', 'MCO'], ['AA', 'DFW'], ['B6', 'MCO'], ['DL', 'DTW'], ['DL', 'MCO'],
-  ['EV', 'ALB'], ['UA', 'LAX'], ['MQ', 'RDU'], ['UA', 'ORD'], ['EV', 'BTV'], ['B6', 'BOS'],
-  ['B6', 'IAD'], ['WN', 'MDW'], ['WN', 'MDW'], ['AA', 'MCO'], ['B6', 'FLL'], ['EV', 'GSO'],
-  ['EV', 'BUF'], ['AA', 'SFO'], ['AA', 'MIA'], ['B6', 'FLL'], ['EV', 'MHT'], ['B6', 'RDU'],
-  ['DL', 'ATL'], ['9E', 'PIT'], ['US', 'PHX'], ['DL', 'MSP'], ['UA', 'CLE'], ['EV', 'ATL'],
-  ['MQ', 'BNA'], ['MQ', 'CMH'], ['EV', 'RDU'], ['UA', 'LAX'], ['B6', 'PBI'], ['UA', 'ORD'],
-  ['EV', 'RIC'], ['AA', 'MIA'], ['B6', 'PHX'], ['WN', 'HOU'], ['WN', 'BWI'], ['B6', 'LGB'],
-  ['UA', 'SFO'], ['AS', 'SEA'], ['EV', 'DCA'], ['MQ', 'CLE'], ['9E', 'CHS'], ['DL', 'SEA'],
-  ['UA', 'ORD'], ['US', 'CLT'], ['DL', 'MSP'], ['DL', 'DTW'], ['UA', 'SNA'], ['EV', 'BWI'],
-  ['UA', 'LAS'], ['DL', 'ATL'], ['B6', 'SJC'], ['UA', 'DEN'], ['MQ', 'BWI'], ['B6', 'MCO'],
-  ['DL', 'PIT'], ['UA', 'FLL'], ['US', 'CLT'], ['B6', 'BUR'], ['DL', 'SJU'], ['AA', 'SEA'],
-  ['WN', 'BWI'], ['B6', 'OAK'], ['DL', 'BOS'], ['UA', 'SEA'], ['MQ', 'MSP'], ['UA', 'SFO'],
-  ['9E', 'CVG'], ['EV', 'STL'], ['9E', 'DFW'], ['AA', 'LAX'], ['EV', 'MCI'], ['AA', 'STL'],
-  ['VX', 'SFO'], ['MQ', 'ORD'], ['FL', 'ATL'], ['AA', 'SJU'], ['DL', 'ATL'], ['US', 'DCA'],
-  ['EV', 'IAD'], ['DL', 'ATL'], ['DL', 'LAX'], ['WN', 'MKE'], ['B6', 'MCO'], ['B6', 'SJU'],
-  ['US', 'CLT'], ['B6', 'BUF'], ['DL', 'BUF'], ['DL', 'MCO'], ['UA', 'PBI'], ['AA', 'DFW'],
-  ['DL', 'LAS'], ['EV', 'BNA'], ['AA', 'LAX'], ['AA', 'ORD'], ['DL', 'DEN'], ['UA', 'SFO'],
-  ['EV', 'DAY'], ['DL', 'TPA'], ['B6', 'SMF'], ['B6', 'SLC'], ['UA', 'IAH'], ['9E', 'ORD'],
-  ['UA', 'PHX'], ['DL', 'MSY'], ['DL', 'PHX'], ['MQ', 'RDU'], ['EV', 'DSM'], ['MQ', 'CRW'],
-  ['DL', 'MCO'], ['DL', 'MIA'], ['EV', 'IAD'], ['AA', 'DFW'], ['DL', 'TPA'], ['B6', 'PBI'],
-  ['9E', 'SAT'], ['DL', 'SLC'], ['DL', 'PBI'], ['B6', 'MCO'], ['MQ', 'CMH'], ['DL', 'RSW'],
-  ['EV', 'CLT'], ['DL', 'SFO'], ['UA', 'BOS'], ['AA', 'TPA'], ['EV', 'OMA'], ['EV', 'RIC'],
-  ['9E', 'CLE'], ['UA', 'SEA'], ['UA', 'TPA'], ['EV', 'PWM'], ['9E', 'CVG'], ['9E', 'JAX'],
-  ['9E', 'CLT'], ['B6', 'FLL'], ['UA', 'IAH'], ['B6', 'LAS'], ['9E', 'TYS'], ['AA', 'ORD'],
-  ['9E', 'RDU'], ['DL', 'ATL'], ['VX', 'LAX'], ['DL', 'DTW'], ['EV', 'TUL'], ['B6', 'SFO'],
-  ['UA', 'ORD'], ['9E', 'PHL'], ['AA', 'MIA'], ['UA', 'MIA'], ['MQ', 'DCA'], ['DL', 'FLL'],
-  ['EV', 'DCA'], ['WN', 'MDW'], ['MQ', 'ATL'], ['UA', 'CLE'], ['AA', 'BOS'], ['FL', 'CAK'],
-  ['B6', 'PDX'], ['B6', 'MSY'], ['MQ', 'CMH'], ['UA', 'DFW'], ['9E', 'PIT'], ['B6', 'FLL'],
-  ['DL', 'ATL'], ['EV', 'MKE'], ['DL', 'FLL'], ['B6', 'AUS'], ['UA', 'AUS'], ['B6', 'HOU'],
-  ['9E', 'MSY'], ['MQ', 'RDU'], ['UA', 'MCO'], ['9E', 'DCA'], ['UA', 'LAX'], ['EV', 'MHT'],
-  ['UA', 'BQN'], ['EV', 'BUF'], ['AA', 'ORD'], ['B6', 'JAX'], ['B6', 'RSW'], ['EV', 'CMH'],
-  ['EV', 'BHM'], ['EV', 'TYS'], ['B6', 'LAX'], ['MQ', 'DTW'], ['MQ', 'ORD'], ['EV', 'RDU'],
-  ['EV', 'CHS'], ['UA', 'SFO'], ['B6', 'MCO'], ['B6', 'MCO'], ['WN', 'MDW'], ['UA', 'PBI'],
-  ['DL', 'LAX'], ['MQ', 'CLT'], ['MQ', 'RDU'], ['UA', 'IAH'], ['UA', 'FLL'], ['UA', 'TPA'],
-  ['EV', 'IAD'], ['UA', 'BOS'], ['DL', 'LAS'], ['EV', 'SDF'], ['EV', 'GRR'], ['B6', 'MCO'],
-  ['MQ', 'BNA'], ['9E', 'BUF'], ['B6', 'DEN'], ['EV', 'RIC'], ['UA', 'SJU'], ['EV', 'PVD'],
-  ['B6', 'TPA'], ['B6', 'FLL'], ['B6', 'LAS'], ['UA', 'DEN'], ['AA', 'LAX'], ['B6', 'SJU'],
-  ['B6', 'BUF'], ['B6', 'PBI'], ['B6', 'FLL'], ['DL', 'MIA'], ['UA', 'RSW'], ['EV', 'ALB'],
-  ['9E', 'BWI'], ['B6', 'RDU'], ['B6', 'FLL'], ['DL', 'PWM'], ['EV', 'OKC'], ['B6', 'SJU'],
-  ['B6', 'PWM'], ['B6', 'ROC'], ['EV', 'PWM'], ['EV', 'BDL'], ['DL', 'ATL'], ['B6', 'BUF'],
-  ['EV', 'BWI'], ['MQ', 'DCA'], ['EV', 'BTV'], ['B6', 'MCO'], ['B6', 'BTV'], ['B6', 'PSE'],
-  ['B6', 'BQN'], ['EV', 'CVG'], ['EV', 'PIT'], ['EV', 'MHT'], ['EV', 'ATL'], ['EV', 'IND'],
-  ['AA', 'LAX'], ['AA', 'DFW'], ['UA', 'ORD'], ['B6', 'SJU'], ['B6', 'BUF'], ['B6', 'BQN'],
-  ['US', 'CLT'], ['UA', 'IAH'], ['UA', 'IAH'], ['AA', 'MIA'], ['B6', 'BQN'], ['B6', 'MCO'],
-  ['DL', 'DTW'], ['EV', 'IAD'], ['B6', 'FLL'], ['MQ', 'ATL'], ['MQ', 'ORD'], ['EV', 'IAD'],
-  ['B6', 'PBI'], ['B6', 'FLL'], ['DL', 'ATL'], ['MQ', 'DTW'], ['US', 'PHL'], ['EV', 'MKE'],
-  ['B6', 'PBI'], ['B6', 'TPA'], ['DL', 'DTW'], ['EV', 'IAD'], ['FL', 'ATL'], ['AA', 'ORD'],
-  ['UA', 'CLE'], ['WN', 'MDW'], ['WN', 'BWI'], ['UA', 'SFO'], ['AA', 'MIA'], ['AA', 'MIA'],
-  ['B6', 'RSW'], ['EV', 'MSP'], ['DL', 'ATL'], ['DL', 'ATL'], ['MQ', 'RDU'], ['US', 'CLT'],
-  ['DL', 'MSP'], ['UA', 'LAX'], ['B6', 'SJU'], ['AA', 'SJU'], ['UA', 'PBI'], ['AA', 'DFW'],
-  ['B6', 'FLL'], ['DL', 'MSY'], ['US', 'CLT'], ['UA', 'PHX'], ['US', 'PHX'], ['EV', 'CLT'],
-  ['UA', 'MIA'], ['US', 'CLT'], ['EV', 'RDU'], ['UA', 'BOS'], ['MQ', 'CLT'], ['EV', 'PIT'],
-  ['US', 'PHX'], ['WN', 'BWI'], ['UA', 'AUS'], ['AA', 'DFW'], ['UA', 'SFO'], ['EV', 'IND'],
-  ['UA', 'IAH'], ['EV', 'BNA'], ['B6', 'BOS'], ['EV', 'BUF'], ['EV', 'SDF'], ['B6', 'BUF'],
-  ['US', 'CLT'], ['B6', 'MCO'], ['UA', 'DEN'], ['DL', 'SLC'], ['DL', 'SFO'], ['DL', 'MCO'],
-  ['UA', 'LAS'], ['DL', 'ATL'], ['DL', 'MIA'], ['US', 'DCA'], ['DL', 'LAX'], ['EV', 'MSY'],
-  ['AA', 'MCO'], ['B6', 'FLL'], ['B6', 'LAS'], ['DL', 'FLL'], ['VX', 'LAX'], ['UA', 'ORD'],
-  ['EV', 'DTW'], ['B6', 'LAX'], ['UA', 'SNA'], ['UA', 'DEN'], ['MQ', 'XNA'], ['B6', 'MSY'],
-  ['UA', 'FLL'], ['WN', 'HOU'], ['UA', 'LAX'], ['UA', 'MCO'], ['B6', 'SJU'], ['UA', 'ORD'],
-  ['AA', 'MIA'], ['AA', 'FLL'], ['FL', 'MKE'], ['EV', 'CVG'], ['UA', 'RSW'], ['DL', 'DTW'],
-  ['UA', 'SFO'], ['B6', 'MCO'], ['MQ', 'ORD'], ['UA', 'PBI'], ['AS', 'SEA'], ['B6', 'RSW'],
-  ['AA', 'DFW'], ['VX', 'SFO'], ['B6', 'ROC'], ['DL', 'ATL'], ['AA', 'LAX'], ['UA', 'IAH'],
-  ['B6', 'SYR'], ['DL', 'SEA'], ['UA', 'IAH'], ['EV', 'ATL'], ['UA', 'TPA'], ['AA', 'SFO'],
-  ['B6', 'SFO'], ['B6', 'TPA'], ['UA', 'ORD'], ['9E', 'PIT'], ['9E', 'CVG'], ['DL', 'MSP'],
-  ['DL', 'ATL'], ['EV', 'MSP'], ['B6', 'MCO'], ['UA', 'SJU'], ['DL', 'MIA'], ['WN', 'DEN'],
-  ['UA', 'SFO'], ['UA', 'DFW'], ['9E', 'MSP'], ['B6', 'FLL'], ['DL', 'FLL'], ['WN', 'PHX'],
-  ['US', 'CLT'], ['EV', 'OMA'], ['MQ', 'RDU'], ['UA', 'DEN'], ['B6', 'SRQ'], ['FL', 'ATL'],
-  ['B6', 'BOS'], ['AA', 'BOS'], ['AA', 'STT'], ['DL', 'MCO'], ['DL', 'TPA'], ['B6', 'PIT'],
-  ['DL', 'TPA'], ['DL', 'ATL'], ['DL', 'LAS'], ['MQ', 'CMH'], ['US', 'CLT'], ['9E', 'ORD'],
-  ['DL', 'DEN'], ['EV', 'MHT'], ['MQ', 'BNA'], ['MQ', 'DCA'], ['US', 'CLT'], ['EV', 'MEM'],
-  ['9E', 'RDU'], ['EV', 'GSO'], ['UA', 'LAX'], ['B6', 'ORD'], ['DL', 'PBI'], ['UA', 'FLL'],
-  ['DL', 'SJU'], ['UA', 'MCO'], ['EV', 'JAX'], ['EV', 'GRR'], ['EV', 'MYR'], ['MQ', 'ATL'],
-  ['EV', 'RDU'], ['F9', 'DEN'], ['WN', 'MDW'], ['EV', 'RIC'], ['9E', 'DCA'], ['9E', 'BOS'],
-  ['B6', 'JAX'], ['B6', 'SAN'], ['UA', 'SFO'], ['UA', 'BOS'], ['B6', 'RSW'], ['MQ', 'CLE'],
-  ['B6', 'SJU'], ['UA', 'SAN'], ['B6', 'TPA'], ['EV', 'XNA'], ['EV', 'DTW'], ['EV', 'IND'],
-  ['EV', 'PWM'], ['AA', 'MIA'], ['DL', 'DTW'], ['9E', 'DTW'], ['DL', 'ATL'], ['US', 'CLT'],
-  ['AA', 'ORD'], ['EV', 'MCI'], ['AA', 'LAX'], ['DL', 'LAX'], ['EV', 'CVG'], ['EV', 'DAY'],
-  ['DL', 'ATL'], ['DL', 'MCO'], ['MQ', 'DTW'], ['VX', 'LAX'], ['UA', 'DEN'], ['9E', 'BWI'],
-  ['AA', 'MIA'], ['UA', 'IAH']]
-};
-
-// Call Code to Build the system ///////////////////////////////////////////////////////////////////
-
-var v  = new BrunelVis('visualization');
-v.build(table1);
+			+ '<span class="field">' + data.dest_f(d) + '</span>'
+
+            }
+
+          };
+
+          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
+
+        }
+
+        // Create selections, set the initial state and transition updates
+
+        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
+
+        var added = selection.enter().append('rect');
+
+        merged = selection.merge(added);
+
+        initialState(added);
+
+        selection.filter(BrunelD3.hasData)
+
+          .classed('selected', BrunelD3.isSelected(data))
+
+          .filter(BrunelD3.isSelected(data)).raise();
+
+        updateState(BrunelD3.transition(merged, transitionMillis));
+
+        label(merged, transitionMillis);
+
+
+
+        BrunelD3.transition(selection.exit(), transitionMillis/3)
+
+          .style('opacity', 0.5).each( function() {
+
+            this.remove(); BrunelD3.removeLabels(this); 
+
+        });
+
+      }
+
+
+
+      return {
+
+        data:           function() { return processed },
+
+        original:       function() { return original },
+
+        internal:       function() { return data },
+
+        selection:      function() { return merged },
+
+        makeData:       makeData,
+
+        build:          build,
+
+        chart:          function() { return charts[0] },
+
+        group:          function() { return elementGroup },
+
+        fields: {
+
+          x:            ['carrier'],
+
+          y:            ['dest'],
+
+          key:          ['#row']
+
+        }
+
+      };
+
+    }();
+
+
+
+    function build(time, noData) {
+
+      var first = elements[0].data() == null;
+
+      if (first) time = 0;                                           // no transition for first call
+
+      buildAxes(time);
+
+      if ((first || time > -1) && !noData) {
+
+        elements[0].makeData();
+
+      }
+
+      elements[0].build(time);
+
+    }
+
+
+
+    // Expose the following components of the chart
+
+    return {
+
+      elements : elements,
+
+      interior : interior,
+
+      scales: {x:scale_x, y:scale_y},
+
+      zoom: function(params, time) {
+
+          if (params) zoom.on('zoom').call(zoomNode, params, time);
+
+          return d3.zoomTransform(zoomNode);
+
+      },
+
+      build : build
+
+    };
+
+    }();
+
+
+
+  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
+
+  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
+
+  function buildAll() {
+
+    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
+
+    updateAll(transitionTime);
+
+  }
+
+
+
+  return {
+
+    dataPreProcess:     function(f) { if (f) pre = f; return pre },
+
+    dataPostProcess:    function(f) { if (f) post = f; return post },
+
+    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
+
+    visId:              visId,
+
+    build:              buildAll,
+
+    rebuild:            updateAll,
+
+    charts:             charts
+
+  }
+
+}
+
+
+
+// Data Tables /////////////////////////////////////////////////////////////////////////////////////
+
+
+
+var table1 = {
+
+   summarized: false,
+
+   names: ['carrier', 'dest'], 
+
+   options: ['string', 'string'], 
+
+   rows: [['UA', 'IAH'], ['UA', 'IAH'], ['AA', 'MIA'], ['B6', 'BQN'], ['DL', 'ATL'], ['UA', 'ORD'],
+
+  ['B6', 'FLL'], ['EV', 'IAD'], ['B6', 'MCO'], ['AA', 'ORD'], ['B6', 'PBI'], ['B6', 'TPA'],
+
+  ['UA', 'LAX'], ['UA', 'SFO'], ['AA', 'DFW'], ['B6', 'BOS'], ['UA', 'LAS'], ['B6', 'FLL'],
+
+  ['MQ', 'ATL'], ['B6', 'PBI'], ['DL', 'MSP'], ['MQ', 'DTW'], ['AA', 'MIA'], ['DL', 'ATL'],
+
+  ['UA', 'MIA'], ['MQ', 'ORD'], ['UA', 'SFO'], ['B6', 'RSW'], ['B6', 'SJU'], ['DL', 'ATL'],
+
+  ['US', 'PHX'], ['AA', 'MIA'], ['UA', 'IAH'], ['EV', 'MSP'], ['MQ', 'MSP'], ['US', 'PHX'],
+
+  ['AA', 'SJU'], ['UA', 'LAX'], ['AA', 'ORD'], ['WN', 'BWI'], ['US', 'CLT'], ['EV', 'IAD'],
+
+  ['AA', 'DFW'], ['B6', 'MCO'], ['B6', 'BOS'], ['UA', 'PBI'], ['US', 'CLT'], ['UA', 'FLL'],
+
+  ['B6', 'BUF'], ['UA', 'DEN'], ['UA', 'SNA'], ['B6', 'LAS'], ['B6', 'MSY'], ['DL', 'PBI'],
+
+  ['DL', 'SLC'], ['DL', 'SFO'], ['DL', 'MIA'], ['AA', 'ORD'], ['AA', 'MCO'], ['MQ', 'XNA'],
+
+  ['UA', 'TPA'], ['DL', 'FLL'], ['DL', 'ATL'], ['VX', 'LAX'], ['AA', 'MIA'], ['B6', 'FLL'],
+
+  ['DL', 'DTW'], ['UA', 'RSW'], ['UA', 'SJU'], ['B6', 'LAX'], ['UA', 'ORD'], ['B6', 'SJU'],
+
+  ['AA', 'FLL'], ['UA', 'ORD'], ['FL', 'MKE'], ['B6', 'MCO'], ['UA', 'PBI'], ['AA', 'DFW'],
+
+  ['AS', 'SEA'], ['AA', 'DFW'], ['UA', 'DEN'], ['UA', 'IAH'], ['VX', 'SFO'], ['B6', 'ROC'],
+
+  ['B6', 'RSW'], ['UA', 'MCO'], ['B6', 'SYR'], ['B6', 'SFO'], ['AA', 'ORD'], ['UA', 'IAH'],
+
+  ['B6', 'TPA'], ['AA', 'LAX'], ['B6', 'SRQ'], ['DL', 'SEA'], ['AA', 'SFO'], ['UA', 'SFO'],
+
+  ['MQ', 'ORD'], ['DL', 'MCO'], ['UA', 'DEN'], ['US', 'CLT'], ['AA', 'MIA'], ['DL', 'ATL'],
+
+  ['WN', 'DEN'], ['B6', 'MCO'], ['DL', 'MIA'], ['DL', 'MSP'], ['MQ', 'RDU'], ['B6', 'BOS'],
+
+  ['AA', 'BOS'], ['UA', 'SFO'], ['DL', 'MCO'], ['B6', 'CLT'], ['B6', 'FLL'], ['MQ', 'CMH'],
+
+  ['DL', 'ATL'], ['EV', 'JAX'], ['9E', 'MSP'], ['DL', 'PBI'], ['EV', 'CHS'], ['MQ', 'CLT'],
+
+  ['US', 'CLT'], ['EV', 'MEM'], ['DL', 'DEN'], ['FL', 'ATL'], ['B6', 'PIT'], ['B6', 'SJU'],
+
+  ['DL', 'BOS'], ['DL', 'SJU'], ['B6', 'SAN'], ['MQ', 'DCA'], ['EV', 'CLE'], ['US', 'CLT'],
+
+  ['UA', 'DFW'], ['AA', 'STL'], ['B6', 'JAX'], ['AA', 'MIA'], ['UA', 'SFO'], ['B6', 'ORD'],
+
+  ['UA', 'LAX'], ['UA', 'LAX'], ['UA', 'MCO'], ['AA', 'ORD'], ['MQ', 'ATL'], ['EV', 'MYR'],
+
+  ['MQ', 'RDU'], ['F9', 'DEN'], ['AA', 'DFW'], ['MQ', 'CLE'], ['AA', 'SJU'], ['DL', 'DTW'],
+
+  ['B6', 'RSW'], ['MQ', 'BWI'], ['UA', 'JAC'], ['EV', 'RDU'], ['DL', 'DTW'], ['UA', 'SAN'],
+
+  ['WN', 'MDW'], ['B6', 'TPA'], ['DL', 'ATL'], ['AA', 'LAX'], ['DL', 'MIA'], ['UA', 'PBI'],
+
+  ['HA', 'HNL'], ['DL', 'DTW'], ['DL', 'ATL'], ['UA', 'SEA'], ['MQ', 'DTW'], ['DL', 'MCO'],
+
+  ['VX', 'LAX'], ['UA', 'FLL'], ['UA', 'ORD'], ['MQ', 'BNA'], ['UA', 'MIA'], ['B6', 'AUS'],
+
+  ['UA', 'DEN'], ['B6', 'BTV'], ['US', 'PHL'], ['UA', 'IAH'], ['AA', 'STT'], ['AA', 'MIA'],
+
+  ['UA', 'MIA'], ['UA', 'STT'], ['AA', 'DFW'], ['UA', 'CLE'], ['AA', 'DFW'], ['B6', 'MCO'],
+
+  ['B6', 'RDU'], ['B6', 'IAD'], ['MQ', 'CLT'], ['DL', 'LAX'], ['B6', 'BOS'], ['B6', 'SJU'],
+
+  ['B6', 'PBI'], ['UA', 'EGE'], ['DL', 'RSW'], ['EV', 'DCA'], ['WN', 'DEN'], ['UA', 'TPA'],
+
+  ['B6', 'FLL'], ['UA', 'ORD'], ['VX', 'LAS'], ['B6', 'BUF'], ['B6', 'FLL'], ['WN', 'MDW'],
+
+  ['DL', 'TPA'], ['DL', 'SRQ'], ['B6', 'PBI'], ['WN', 'MKE'], ['AA', 'ORD'], ['MQ', 'ATL'],
+
+  ['B6', 'LAX'], ['EV', 'AVL'], ['B6', 'PWM'], ['EV', 'STL'], ['MQ', 'BNA'], ['UA', 'LAX'],
+
+  ['US', 'PHX'], ['DL', 'ATL'], ['UA', 'BOS'], ['DL', 'FLL'], ['US', 'CLT'], ['B6', 'FLL'],
+
+  ['US', 'PHX'], ['UA', 'DEN'], ['MQ', 'ORD'], ['DL', 'MSP'], ['US', 'CLT'], ['US', 'CLT'],
+
+  ['EV', 'IAD'], ['DL', 'LAS'], ['FL', 'ATL'], ['EV', 'BUF'], ['MQ', 'RDU'], ['AA', 'DFW'],
+
+  ['UA', 'MCO'], ['AA', 'LAX'], ['UA', 'IAH'], ['AA', 'SFO'], ['EV', 'CHS'], ['VX', 'SFO'],
+
+  ['UA', 'FLL'], ['EV', 'IND'], ['UA', 'BOS'], ['AA', 'ORD'], ['UA', 'ORD'], ['B6', 'MCO'],
+
+  ['EV', 'MKE'], ['UA', 'IAH'], ['UA', 'RSW'], ['AA', 'DFW'], ['DL', 'SLC'], ['MQ', 'DTW'],
+
+  ['B6', 'FLL'], ['DL', 'ATL'], ['EV', 'PWM'], ['DL', 'TPA'], ['US', 'DCA'], ['WN', 'BWI'],
+
+  ['MQ', 'DCA'], ['UA', 'LAS'], ['B6', 'PBI'], ['DL', 'MIA'], ['UA', 'SFO'], ['MQ', 'CMH'],
+
+  ['AA', 'MIA'], ['B6', 'BTV'], ['UA', 'SFO'], ['DL', 'DTW'], ['UA', 'IAH'], ['EV', 'SAV'],
+
+  ['WN', 'STL'], ['UA', 'DEN'], ['B6', 'SFO'], ['DL', 'RSW'], ['US', 'CLT'], ['EV', 'RDU'],
+
+  ['UA', 'LAX'], ['UA', 'PBI'], ['UA', 'TPA'], ['AA', 'ORD'], ['DL', 'MSP'], ['MQ', 'CLE'],
+
+  ['B6', 'RSW'], ['VX', 'LAX'], ['AA', 'MIA'], ['DL', 'PBI'], ['UA', 'SNA'], ['EV', 'ATL'],
+
+  ['FL', 'CAK'], ['EV', 'SYR'], ['EV', 'CMH'], ['B6', 'FLL'], ['DL', 'LAX'], ['B6', 'BOS'],
+
+  ['MQ', 'ATL'], ['AA', 'LAX'], ['DL', 'FLL'], ['DL', 'ATL'], ['MQ', 'DCA'], ['EV', 'ROC'],
+
+  ['MQ', 'RDU'], ['UA', 'MCO'], ['AA', 'DFW'], ['WN', 'BWI'], ['UA', 'ORD'], ['US', 'CLT'],
+
+  ['EV', 'BTV'], ['UA', 'SJU'], ['EV', 'ATL'], ['VX', 'SFO'], ['B6', 'MCO'], ['UA', 'IAH'],
+
+  ['EV', 'BUF'], ['B6', 'HOU'], ['EV', 'CLT'], ['MQ', 'ORD'], ['UA', 'SFO'], ['AA', 'STL'],
+
+  ['DL', 'MSY'], ['WN', 'MDW'], ['EV', 'JAX'], ['B6', 'TPA'], ['UA', 'PHX'], ['EV', 'DTW'],
+
+  ['DL', 'DTW'], ['UA', 'FLL'], ['AA', 'BOS'], ['WN', 'MKE'], ['EV', 'DTW'], ['AA', 'MIA'],
+
+  ['MQ', 'RDU'], ['EV', 'DCA'], ['DL', 'SLC'], ['DL', 'SJU'], ['B6', 'BUF'], ['UA', 'IAH'],
+
+  ['B6', 'FLL'], ['AA', 'DFW'], ['UA', 'DEN'], ['DL', 'ATL'], ['WN', 'DEN'], ['MQ', 'BNA'],
+
+  ['US', 'CLT'], ['US', 'BOS'], ['B6', 'LGB'], ['MQ', 'CMH'], ['FL', 'ATL'], ['AA', 'ORD'],
+
+  ['AA', 'DFW'], ['MQ', 'MSP'], ['UA', 'DFW'], ['B6', 'BOS'], ['UA', 'MIA'], ['EV', 'DAY'],
+
+  ['B6', 'ROC'], ['MQ', 'DTW'], ['AA', 'MIA'], ['WN', 'HOU'], ['B6', 'PBI'], ['US', 'CLT'],
+
+  ['EV', 'ALB'], ['EV', 'BWI'], ['MQ', 'RDU'], ['EV', 'BDL'], ['B6', 'MCO'], ['UA', 'LAX'],
+
+  ['DL', 'SLC'], ['DL', 'ATL'], ['VX', 'LAX'], ['UA', 'FLL'], ['EV', 'IND'], ['B6', 'JAX'],
+
+  ['EV', 'PIT'], ['B6', 'LAX'], ['AA', 'MIA'], ['B6', 'SRQ'], ['AA', 'LAX'], ['EV', 'STL'],
+
+  ['AA', 'DFW'], ['UA', 'HNL'], ['WN', 'PHX'], ['EV', 'BUF'], ['B6', 'PWM'], ['EV', 'MHT'],
+
+  ['EV', 'MSN'], ['EV', 'CHS'], ['DL', 'BOS'], ['EV', 'GSO'], ['B6', 'MCO'], ['WN', 'MDW'],
+
+  ['MQ', 'CLT'], ['UA', 'ORD'], ['UA', 'ORD'], ['UA', 'IAH'], ['US', 'PHX'], ['EV', 'MEM'],
+
+  ['DL', 'ATL'], ['EV', 'MEM'], ['FL', 'ATL'], ['B6', 'FLL'], ['UA', 'ORD'], ['UA', 'SEA'],
+
+  ['MQ', 'ORD'], ['B6', 'BOS'], ['B6', 'SEA'], ['DL', 'RSW'], ['MQ', 'CLE'], ['UA', 'SFO'],
+
+  ['EV', 'IAD'], ['EV', 'CVG'], ['EV', 'ATL'], ['B6', 'BUR'], ['UA', 'PBI'], ['UA', 'IAH'],
+
+  ['B6', 'PBI'], ['UA', 'CLE'], ['DL', 'MSP'], ['DL', 'SFO'], ['DL', 'DCA'], ['DL', 'DTW'],
+
+  ['AA', 'MCO'], ['EV', 'IAD'], ['AA', 'ORD'], ['MQ', 'ATL'], ['AA', 'MIA'], ['US', 'CLT'],
+
+  ['MQ', 'RDU'], ['9E', 'IAD'], ['9E', 'BUF'], ['B6', 'FLL'], ['MQ', 'CLE'], ['US', 'DCA'],
+
+  ['EV', 'PWM'], ['9E', 'SYR'], ['DL', 'LAX'], ['B6', 'MSY'], ['B6', 'PIT'], ['DL', 'PBI'],
+
+  ['UA', 'ORD'], ['UA', 'AUS'], ['UA', 'RSW'], ['US', 'CLT'], ['MQ', 'CMH'], ['EV', 'CMH'],
+
+  ['UA', 'TPA'], ['B6', 'FLL'], ['UA', 'FLL'], ['EV', 'RIC'], ['MQ', 'RDU'], ['AA', 'DFW'],
+
+  ['UA', 'DEN'], ['9E', 'ROC'], ['MQ', 'IND'], ['UA', 'MCO'], ['B6', 'TPA'], ['DL', 'ATL'],
+
+  ['DL', 'BUF'], ['B6', 'MCO'], ['EV', 'CLT'], ['MQ', 'PIT'], ['B6', 'SRQ'], ['UA', 'SFO'],
+
+  ['AA', 'DFW'], ['MQ', 'DCA'], ['UA', 'MCO'], ['DL', 'MCO'], ['MQ', 'CMH'], ['UA', 'LAX'],
+
+  ['UA', 'LAX'], ['B6', 'PBI'], ['B6', 'MCO'], ['MQ', 'XNA'], ['WN', 'MDW'], ['AA', 'FLL'],
+
+  ['B6', 'BUF'], ['B6', 'RSW'], ['UA', 'IAH'], ['EV', 'STL'], ['AA', 'STL'], ['UA', 'ORD'],
+
+  ['US', 'CLT'], ['9E', 'BWI'], ['EV', 'DCA'], ['EV', 'GSP'], ['UA', 'DEN'], ['EV', 'GRR'],
+
+  ['WN', 'MKE'], ['DL', 'MCO'], ['AA', 'SFO'], ['AA', 'LAX'], ['UA', 'LAS'], ['B6', 'SJU'],
+
+  ['DL', 'SAN'], ['DL', 'SLC'], ['UA', 'CLE'], ['9E', 'ORD'], ['DL', 'ATL'], ['MQ', 'MSP'],
+
+  ['EV', 'MCI'], ['UA', 'MIA'], ['9E', 'IND'], ['EV', 'IAD'], ['FL', 'ATL'], ['9E', 'BNA'],
+
+  ['AA', 'DFW'], ['9E', 'BOS'], ['DL', 'ATL'], ['MQ', 'CVG'], ['EV', 'PIT'], ['DL', 'RSW'],
+
+  ['UA', 'ORD'], ['EV', 'BNA'], ['EV', 'IAD'], ['B6', 'FLL'], ['DL', 'LAS'], ['9E', 'PHL'],
+
+  ['UA', 'ORD'], ['DL', 'MCI'], ['EV', 'BUF'], ['B6', 'ORD'], ['WN', 'DEN'], ['MQ', 'RDU'],
+
+  ['UA', 'FLL'], ['MQ', 'CLT'], ['AA', 'ORD'], ['B6', 'SYR'], ['UA', 'BOS'], ['AA', 'DFW'],
+
+  ['AA', 'MIA'], ['B6', 'MCO'], ['DL', 'FLL'], ['DL', 'MSP'], ['DL', 'DEN'], ['UA', 'PHX'],
+
+  ['EV', 'PIT'], ['MQ', 'ATL'], ['UA', 'IAH'], ['DL', 'ATL'], ['US', 'PHX'], ['AA', 'SJU'],
+
+  ['B6', 'LAX'], ['DL', 'DTW'], ['B6', 'TPA'], ['VX', 'SFO'], ['EV', 'IAD'], ['DL', 'DEN'],
+
+  ['EV', 'CVG'], ['B6', 'PBI'], ['EV', 'DCA'], ['US', 'PHX'], ['UA', 'SAN'], ['WN', 'STL'],
+
+  ['MQ', 'ORD'], ['UA', 'DEN'], ['UA', 'CLE'], ['B6', 'BOS'], ['9E', 'MSP'], ['EV', 'MKE'],
+
+  ['MQ', 'DTW'], ['AA', 'BOS'], ['UA', 'RSW'], ['EV', 'GSO'], ['EV', 'ATL'], ['B6', 'TPA'],
+
+  ['B6', 'SAN'], ['AA', 'DFW'], ['DL', 'FLL'], ['EV', 'MHT'], ['DL', 'AUS'], ['EV', 'ALB'],
+
+  ['AA', 'EGE'], ['DL', 'SFO'], ['VX', 'LAX'], ['AA', 'LAS'], ['WN', 'STL'], ['UA', 'MCO'],
+
+  ['MQ', 'ORF'], ['AA', 'AUS'], ['UA', 'ORD'], ['UA', 'IAH'], ['AA', 'DFW'], ['US', 'CLT'],
+
+  ['DL', 'ATL'], ['UA', 'LAX'], ['WN', 'HOU'], ['EV', 'BTV'], ['B6', 'CLT'], ['B6', 'PBI'],
+
+  ['UA', 'DEN'], ['UA', 'SAT'], ['B6', 'FLL'], ['AA', 'ORD'], ['F9', 'DEN'], ['B6', 'SJU'],
+
+  ['UA', 'ORD'], ['AA', 'ORD'], ['B6', 'SJU'], ['MQ', 'RDU'], ['DL', 'LAX'], ['US', 'CLT'],
+
+  ['UA', 'IAH'], ['AA', 'MIA'], ['UA', 'SFO'], ['AA', 'SAN'], ['EV', 'SDF'], ['UA', 'SFO'],
+
+  ['FL', 'ATL'], ['B6', 'PHX'], ['UA', 'SEA'], ['EV', 'DAY'], ['B6', 'RSW'], ['B6', 'PBI'],
+
+  ['DL', 'DTW'], ['DL', 'PDX'], ['DL', 'MIA'], ['MQ', 'XNA'], ['DL', 'MCO'], ['9E', 'RDU'],
+
+  ['B6', 'MCO'], ['B6', 'TPA'], ['DL', 'TPA'], ['WN', 'MDW'], ['B6', 'IAD'], ['UA', 'LAX'],
+
+  ['B6', 'MCO'], ['WN', 'MDW'], ['B6', 'MCO'], ['UA', 'MCO'], ['EV', 'DCA'], ['DL', 'ATL'],
+
+  ['B6', 'BOS'], ['B6', 'FLL'], ['UA', 'ORD'], ['EV', 'CMH'], ['B6', 'RDU'], ['UA', 'CLE'],
+
+  ['DL', 'BUF'], ['UA', 'LAX'], ['EV', 'DTW'], ['MQ', 'BNA'], ['US', 'CLT'], ['UA', 'PDX'],
+
+  ['MQ', 'BNA'], ['UA', 'SAN'], ['AS', 'SEA'], ['B6', 'LGB'], ['UA', 'DFW'], ['EV', 'STL'],
+
+  ['B6', 'SJC'], ['EV', 'OMA'], ['WN', 'BWI'], ['MQ', 'CMH'], ['UA', 'LAS'], ['AA', 'ORD'],
+
+  ['AA', 'LAX'], ['DL', 'MSP'], ['AA', 'SEA'], ['9E', 'DTW'], ['US', 'CLT'], ['AA', 'MIA'],
+
+  ['DL', 'SEA'], ['UA', 'DEN'], ['EV', 'CLE'], ['UA', 'PBI'], ['EV', 'PWM'], ['9E', 'CHS'],
+
+  ['UA', 'SNA'], ['MQ', 'ORD'], ['UA', 'ORD'], ['EV', 'CVG'], ['B6', 'BUF'], ['MQ', 'CRW'],
+
+  ['UA', 'SFO'], ['EV', 'BTV'], ['UA', 'FLL'], ['AA', 'STL'], ['DL', 'BOS'], ['DL', 'SJU'],
+
+  ['AA', 'DFW'], ['AA', 'SJU'], ['AA', 'SFO'], ['FL', 'ATL'], ['EV', 'IAD'], ['9E', 'MSY'],
+
+  ['VX', 'SFO'], ['US', 'DCA'], ['MQ', 'CLE'], ['DL', 'ATL'], ['UA', 'IAH'], ['AA', 'LAX'],
+
+  ['B6', 'MCO'], ['DL', 'ATL'], ['WN', 'MKE'], ['EV', 'RIC'], ['DL', 'MIA'], ['B6', 'OAK'],
+
+  ['DL', 'MCO'], ['UA', 'TPA'], ['DL', 'SFO'], ['DL', 'TPA'], ['B6', 'SLC'], ['DL', 'LAS'],
+
+  ['EV', 'BNA'], ['9E', 'ORD'], ['US', 'CLT'], ['MQ', 'RDU'], ['DL', 'MCO'], ['UA', 'PHX'],
+
+  ['DL', 'SLC'], ['UA', 'SFO'], ['AA', 'ORD'], ['EV', 'CLT'], ['DL', 'PHX'], ['EV', 'GRR'],
+
+  ['B6', 'SMF'], ['EV', 'IAD'], ['DL', 'LAX'], ['AA', 'DFW'], ['9E', 'RDU'], ['UA', 'BQN'],
+
+  ['DL', 'SAN'], ['MQ', 'BNA'], ['EV', 'OMA'], ['AA', 'LAX'], ['EV', 'RIC'], ['9E', 'DFW'],
+
+  ['AA', 'TPA'], ['UA', 'BOS'], ['B6', 'FLL'], ['MQ', 'DCA'], ['9E', 'JAX'], ['EV', 'CHS'],
+
+  ['B6', 'LAS'], ['EV', 'TUL'], ['VX', 'LAX'], ['UA', 'SEA'], ['9E', 'PIT'], ['9E', 'BWI'],
+
+  ['B6', 'SFO'], ['UA', 'DFW'], ['DL', 'SAT'], ['UA', 'IAH'], ['EV', 'TYS'], ['9E', 'PHL'],
+
+  ['AA', 'MIA'], ['UA', 'MIA'], ['EV', 'SAV'], ['UA', 'ORD'], ['MQ', 'MSP'], ['MQ', 'CMH'],
+
+  ['EV', 'PIT'], ['UA', 'CLE'], ['AA', 'BOS'], ['9E', 'BUF'], ['EV', 'OKC'], ['MQ', 'CMH'],
+
+  ['9E', 'CLE'], ['B6', 'FLL'], ['UA', 'RSW'], ['FL', 'CAK'], ['B6', 'AUS'], ['9E', 'CVG'],
+
+  ['B6', 'BUR'], ['DL', 'FLL'], ['UA', 'AUS'], ['EV', 'MKE'], ['B6', 'PBI'], ['WN', 'MDW'],
+
+  ['EV', 'MHT'], ['AA', 'ORD'], ['B6', 'HOU'], ['B6', 'MSY'], ['UA', 'IAH'], ['UA', 'BOS'],
+
+  ['UA', 'LAX'], ['EV', 'RDU'], ['B6', 'JAX'], ['9E', 'DCA'], ['UA', 'MCO'], ['MQ', 'RDU'],
+
+  ['B6', 'PDX'], ['B6', 'RSW'], ['MQ', 'DTW'], ['UA', 'PBI'], ['EV', 'ALB'], ['EV', 'IAD'],
+
+  ['B6', 'MCO'], ['MQ', 'RDU'], ['MQ', 'ORD'], ['EV', 'SDF'], ['WN', 'MDW'], ['UA', 'TPA'],
+
+  ['MQ', 'CLT'], ['B6', 'BOS'], ['UA', 'SJU'], ['DL', 'LAS'], ['B6', 'LAX'], ['UA', 'SFO'],
+
+  ['B6', 'MCO'], ['MQ', 'ATL'], ['EV', 'RIC'], ['9E', 'CVG'], ['EV', 'PVD'], ['EV', 'DSM'],
+
+  ['B6', 'FLL'], ['B6', 'MCO'], ['MQ', 'BNA'], ['AA', 'LAX'], ['MQ', 'DCA'], ['B6', 'DEN'],
+
+  ['UA', 'FLL'], ['B6', 'FLL'], ['B6', 'SJU'], ['B6', 'MCO'], ['EV', 'BWI'], ['AA', 'MIA'],
+
+  ['B6', 'PBI'], ['B6', 'RDU'], ['B6', 'BUF'], ['B6', 'SJU'], ['B6', 'TPA'], ['EV', 'BUF'],
+
+  ['EV', 'PWM'], ['B6', 'FLL'], ['B6', 'PWM'], ['B6', 'BOS'], ['EV', 'BDL'], ['B6', 'ROC'],
+
+  ['B6', 'BTV'], ['B6', 'BUF'], ['EV', 'DCA'], ['EV', 'BTV'], ['B6', 'LAS'], ['B6', 'SYR'],
+
+  ['EV', 'MCI'], ['B6', 'PSE'], ['B6', 'SJU'], ['B6', 'BQN'], ['EV', 'RDU'], ['AA', 'DFW'],
+
+  ['AA', 'MIA'], ['B6', 'FLL'], ['B6', 'SJU'], ['B6', 'SYR'], ['US', 'CLT'], ['UA', 'IAH'],
+
+  ['AA', 'MIA'], ['UA', 'IAH'], ['B6', 'BQN'], ['B6', 'FLL'], ['B6', 'PBI'], ['B6', 'FLL'],
+
+  ['AA', 'DFW'], ['B6', 'TPA'], ['DL', 'DTW'], ['EV', 'IAD'], ['DL', 'ATL'], ['DL', 'CVG'],
+
+  ['FL', 'ATL'], ['UA', 'SFO'], ['UA', 'LAS'], ['UA', 'MIA'], ['EV', 'CMH'], ['EV', 'MSP'],
+
+  ['9E', 'CVG'], ['B6', 'MCO'], ['WN', 'MDW'], ['MQ', 'DTW'], ['UA', 'ORD'], ['US', 'PHL'],
+
+  ['AA', 'ORD'], ['UA', 'LAX'], ['UA', 'SFO'], ['DL', 'ATL'], ['DL', 'MSP'], ['AA', 'MIA'],
+
+  ['B6', 'FLL'], ['EV', 'MEM'], ['DL', 'ATL'], ['WN', 'MDW'], ['B6', 'PBI'], ['B6', 'SJU'],
+
+  ['UA', 'LAX'], ['US', 'CLT'], ['AA', 'MIA'], ['MQ', 'MSP'], ['MQ', 'ATL'], ['MQ', 'CLT'],
+
+  ['UA', 'IAH'], ['UA', 'DFW'], ['US', 'CLT'], ['DL', 'TPA'], ['WN', 'BWI'], ['EV', 'IAD'],
+
+  ['EV', 'CVG'], ['US', 'PHX'], ['B6', 'RSW'], ['DL', 'FLL'], ['WN', 'BWI'], ['EV', 'RDU'],
+
+  ['UA', 'LAX'], ['AA', 'ORD'], ['UA', 'AUS'], ['UA', 'PHX'], ['EV', 'BNA'], ['US', 'PHX'],
+
+  ['UA', 'CLE'], ['B6', 'BOS'], ['UA', 'PBI'], ['EV', 'ATL'], ['AA', 'DFW'], ['B6', 'BUF'],
+
+  ['B6', 'MCO'], ['US', 'CLT'], ['UA', 'DEN'], ['UA', 'BOS'], ['US', 'CLT'], ['DL', 'SLC'],
+
+  ['UA', 'MCO'], ['DL', 'SFO'], ['UA', 'FLL'], ['AA', 'MCO'], ['B6', 'LAS'], ['DL', 'LAX'],
+
+  ['DL', 'PBI'], ['DL', 'MIA'], ['B6', 'FLL'], ['MQ', 'XNA'], ['US', 'DCA'], ['VX', 'LAX'],
+
+  ['EV', 'CLT'], ['AA', 'ORD'], ['AA', 'MIA'], ['DL', 'MSY'], ['UA', 'TPA'], ['B6', 'MSY'],
+
+  ['DL', 'DTW'], ['UA', 'SJU'], ['AA', 'SJU'], ['MQ', 'ORD'], ['AA', 'MIA'], ['B6', 'LAX'],
+
+  ['DL', 'ATL'], ['UA', 'ORD'], ['AA', 'FLL'], ['B6', 'MCO'], ['UA', 'SFO'], ['UA', 'RSW'],
+
+  ['MQ', 'ORD'], ['AS', 'SEA'], ['UA', 'ORD'], ['VX', 'SFO'], ['UA', 'SNA'], ['UA', 'DEN'],
+
+  ['FL', 'MKE'], ['B6', 'RSW'], ['DL', 'SEA'], ['B6', 'SJU'], ['AA', 'LAX'], ['B6', 'SYR'],
+
+  ['UA', 'IAH'], ['B6', 'ROC'], ['B6', 'SFO'], ['WN', 'HOU'], ['UA', 'BOS'], ['B6', 'TPA'],
+
+  ['AA', 'ORD'], ['AA', 'SFO'], ['UA', 'MCO'], ['WN', 'DEN'], ['EV', 'GSO'], ['UA', 'DEN'],
+
+  ['9E', 'PHL'], ['DL', 'ATL'], ['AA', 'DFW'], ['UA', 'SFO'], ['B6', 'SRQ'], ['UA', 'PBI'],
+
+  ['9E', 'PIT'], ['EV', 'GSP'], ['EV', 'BTV'], ['UA', 'IAH'], ['EV', 'DCA'], ['DL', 'MCO'],
+
+  ['B6', 'MCO'], ['B6', 'FLL'], ['DL', 'ATL'], ['DL', 'MIA'], ['US', 'CLT'], ['AA', 'MIA'],
+
+  ['B6', 'BOS'], ['DL', 'MCO'], ['AA', 'DFW'], ['MQ', 'RDU'], ['UA', 'PDX'], ['AA', 'STT'],
+
+  ['DL', 'FLL'], ['DL', 'ATL'], ['US', 'CLT'], ['B6', 'PIT'], ['DL', 'MSP'], ['DL', 'DEN'],
+
+  ['DL', 'TPA'], ['MQ', 'BNA'], ['DL', 'PBI'], ['MQ', 'CMH'], ['MQ', 'DCA'], ['EV', 'IND'],
+
+  ['9E', 'ORD'], ['AA', 'BOS'], ['B6', 'CLT'], ['B6', 'SAN'], ['DL', 'LAS'], ['B6', 'JAX'],
+
+  ['B6', 'SJU'], ['UA', 'DFW'], ['UA', 'LAX'], ['FL', 'ATL'], ['AA', 'ORD'], ['DL', 'RSW'],
+
+  ['AA', 'STL'], ['DL', 'MSP'], ['EV', 'OMA'], ['F9', 'DEN'], ['DL', 'SJU'], ['MQ', 'ATL'],
+
+  ['EV', 'ORF'], ['9E', 'DCA'], ['B6', 'ORD'], ['EV', 'ROC'], ['AA', 'DFW'], ['UA', 'LAX'],
+
+  ['UA', 'ORD'], ['EV', 'DAY'], ['WN', 'PHX'], ['EV', 'MSP'], ['9E', 'RDU'], ['AA', 'SJU'],
+
+  ['MQ', 'RDU'], ['UA', 'SFO'], ['EV', 'SYR'], ['9E', 'BUF'], ['MQ', 'CLE'], ['9E', 'DTW'],
+
+  ['B6', 'TPA'], ['UA', 'DEN'], ['EV', 'CHS'], ['9E', 'MSP'], ['B6', 'RSW'], ['UA', 'SAN'],
+
+  ['EV', 'MEM'], ['UA', 'SEA'], ['AA', 'LAX'], ['WN', 'MDW'], ['DL', 'DTW'], ['DL', 'LAX'],
+
+  ['MQ', 'DTW'], ['AA', 'MIA'], ['DL', 'ATL'], ['DL', 'ATL'], ['DL', 'MIA'], ['UA', 'SFO'],
+
+  ['EV', 'RIC'], ['UA', 'LAX'], ['UA', 'CLE'], ['UA', 'IAH'], ['DL', 'MCO'], ['UA', 'JAC'],
+
+  ['UA', 'ORD'], ['VX', 'LAX'], ['B6', 'BTV'], ['EV', 'XNA'], ['B6', 'FLL'], ['HA', 'HNL'],
+
+  ['US', 'CLT'], ['DL', 'DTW'], ['B6', 'IAD'], ['UA', 'IAH'], ['MQ', 'CLT'], ['UA', 'STT'],
+
+  ['B6', 'BOS'], ['EV', 'GRR'], ['AA', 'DFW'], ['AA', 'DFW'], ['EV', 'PIT'], ['B6', 'SJU'],
+
+  ['B6', 'RDU'], ['B6', 'FLL'], ['VX', 'LAS'], ['EV', 'JAX'], ['B6', 'AUS'], ['UA', 'TPA'],
+
+  ['US', 'CLT'], ['DL', 'SRQ'], ['UA', 'EGE'], ['UA', 'PBI'], ['WN', 'DEN'], ['DL', 'TPA'],
+
+  ['UA', 'FLL'], ['B6', 'BUF'], ['WN', 'MKE'], ['EV', 'PWM'], ['B6', 'PBI'], ['B6', 'PBI'],
+
+  ['EV', 'MHT'], ['EV', 'DCA'], ['AA', 'ORD'], ['MQ', 'ATL'], ['EV', 'RDU'], ['B6', 'PWM'],
+
+  ['9E', 'ROC'], ['EV', 'IAD'], ['WN', 'MDW'], ['DL', 'SFO'], ['EV', 'STL'], ['UA', 'MCO'],
+
+  ['DL', 'FLL'], ['B6', 'FLL'], ['US', 'PHX'], ['EV', 'SAV'], ['9E', 'BWI'], ['B6', 'LAX'],
+
+  ['UA', 'DEN'], ['US', 'CLT'], ['US', 'CLT'], ['MQ', 'ORD'], ['US', 'CLT'], ['DL', 'LAS'],
+
+  ['FL', 'ATL'], ['US', 'PHX'], ['DL', 'ATL'], ['AA', 'DFW'], ['EV', 'CHS'], ['B6', 'BOS'],
+
+  ['DL', 'MSP'], ['MQ', 'RDU'], ['UA', 'IAH'], ['DL', 'ATL'], ['VX', 'SFO'], ['EV', 'BUF'],
+
+  ['UA', 'BOS'], ['EV', 'AVL'], ['B6', 'MCO'], ['UA', 'FLL'], ['EV', 'IND'], ['AA', 'LAX'],
+
+  ['MQ', 'DTW'], ['B6', 'PBI'], ['DL', 'MEM'], ['UA', 'ORD'], ['B6', 'FLL'], ['MQ', 'BNA'],
+
+  ['DL', 'SLC'], ['UA', 'SFO'], ['UA', 'RSW'], ['AA', 'DFW'], ['DL', 'MCO'], ['US', 'BOS'],
+
+  ['B6', 'MCO'], ['DL', 'ATL'], ['MQ', 'DCA'], ['UA', 'LAS'], ['US', 'DCA'], ['UA', 'PBI'],
+
+  ['B6', 'SFO'], ['UA', 'IAH'], ['UA', 'SFO'], ['WN', 'BWI'], ['AA', 'MIA'], ['B6', 'BTV'],
+
+  ['DL', 'DTW'], ['MQ', 'CMH'], ['AA', 'ORD'], ['DL', 'MIA'], ['EV', 'PIT'], ['DL', 'MCO'],
+
+  ['UA', 'DEN'], ['AA', 'ORD'], ['US', 'CLT'], ['EV', 'DTW'], ['9E', 'GRR'], ['UA', 'LAX'],
+
+  ['DL', 'RSW'], ['WN', 'STL'], ['B6', 'RSW'], ['UA', 'TPA'], ['UA', 'SJU'], ['VX', 'LAX'],
+
+  ['B6', 'FLL'], ['DL', 'PBI'], ['AA', 'MIA'], ['DL', 'ATL'], ['UA', 'SNA'], ['DL', 'MSP'],
+
+  ['MQ', 'MSP'], ['FL', 'CAK'], ['DL', 'TPA'], ['MQ', 'DCA'], ['AA', 'DFW'], ['B6', 'MCO'],
+
+  ['B6', 'HOU'], ['DL', 'LAX'], ['MQ', 'ATL'], ['UA', 'BOS'], ['B6', 'BOS'], ['DL', 'MSY'],
+
+  ['EV', 'RDU'], ['DL', 'FLL'], ['US', 'CLT'], ['WN', 'STL'], ['UA', 'IAH'], ['VX', 'SFO'],
+
+  ['MQ', 'CLE'], ['AA', 'LAX'], ['EV', 'PWM'], ['MQ', 'RDU'], ['EV', 'BUF'], ['UA', 'MCO'],
+
+  ['EV', 'ATL'], ['UA', 'DEN'], ['AA', 'STL'], ['B6', 'LAX'], ['MQ', 'ORD'], ['B6', 'TPA'],
+
+  ['UA', 'SFO'], ['EV', 'BTV'], ['EV', 'MKE'], ['EV', 'DAY'], ['EV', 'JAX'], ['EV', 'DTW'],
+
+  ['MQ', 'RDU'], ['B6', 'BUF'], ['UA', 'PHX'], ['DL', 'DTW'], ['WN', 'MKE'], ['MQ', 'BNA'],
+
+  ['EV', 'CMH'], ['WN', 'BWI'], ['AA', 'MIA'], ['AA', 'DFW'], ['DL', 'SLC'], ['EV', 'DTW'],
+
+  ['EV', 'MYR'], ['DL', 'SJU'], ['AA', 'DFW'], ['B6', 'LGB'], ['AA', 'BOS'], ['UA', 'IAH'],
+
+  ['9E', 'CVG'], ['DL', 'ATL'], ['US', 'CLT'], ['B6', 'FLL'], ['DL', 'CVG'], ['WN', 'MDW'],
+
+  ['EV', 'DCA'], ['DL', 'ATL'], ['UA', 'DFW'], ['WN', 'DEN'], ['MQ', 'CMH'], ['UA', 'MIA'],
+
+  ['UA', 'ORD'], ['B6', 'PBI'], ['B6', 'BOS'], ['AA', 'ORD'], ['FL', 'ATL'], ['US', 'CLT'],
+
+  ['EV', 'GSO'], ['B6', 'MCO'], ['UA', 'LAX'], ['WN', 'HOU'], ['MQ', 'RDU'], ['B6', 'FLL'],
+
+  ['DL', 'ATL'], ['VX', 'LAX'], ['EV', 'BUF'], ['B6', 'BUR'], ['EV', 'ROC'], ['B6', 'SJU'],
+
+  ['EV', 'MCI'], ['EV', 'ALB'], ['B6', 'ROC'], ['EV', 'BDL'], ['B6', 'MCO'], ['EV', 'OMA'],
+
+  ['B6', 'JAX'], ['B6', 'SRQ'], ['UA', 'FLL'], ['EV', 'CLT'], ['EV', 'STL'], ['AA', 'LAX'],
+
+  ['DL', 'ATL'], ['AA', 'MIA'], ['DL', 'MCO'], ['UA', 'HNL'], ['AA', 'MIA'], ['MQ', 'CLT'],
+
+  ['US', 'PHX'], ['WN', 'MDW'], ['EV', 'RIC'], ['B6', 'SEA'], ['B6', 'MCO'], ['UA', 'IAH'],
+
+  ['EV', 'IAD'], ['B6', 'PWM'], ['MQ', 'DTW'], ['EV', 'CHS'], ['DL', 'BOS'], ['FL', 'ATL'],
+
+  ['DL', 'MIA'], ['MQ', 'ORD'], ['UA', 'MCO'], ['UA', 'SFO'], ['MQ', 'MSP'], ['EV', 'BWI'],
+
+  ['EV', 'MSN'], ['UA', 'ORD'], ['UA', 'PBI'], ['DL', 'ATL'], ['DL', 'FLL'], ['EV', 'IAD'],
+
+  ['DL', 'SFO'], ['WN', 'PHX'], ['UA', 'IAH'], ['UA', 'CLE'], ['B6', 'SRQ'], ['EV', 'MEM'],
+
+  ['B6', 'PBI'], ['DL', 'RSW'], ['DL', 'MSP'], ['DL', 'DCA'], ['US', 'CLT'], ['B6', 'BUF'],
+
+  ['9E', 'BUF'], ['MQ', 'CLE'], ['9E', 'CLT'], ['B6', 'PBI'], ['DL', 'DTW'], ['UA', 'FLL'],
+
+  ['B6', 'MSY'], ['B6', 'FLL'], ['UA', 'TPA'], ['DL', 'MCI'], ['EV', 'STL'], ['AA', 'MIA'],
+
+  ['B6', 'BOS'], ['DL', 'PBI'], ['US', 'DCA'], ['B6', 'PIT'], ['UA', 'MCO'], ['9E', 'ORF'],
+
+  ['AA', 'ORD'], ['MQ', 'ATL'], ['US', 'CLT'], ['DL', 'ATL'], ['MQ', 'CMH'], ['DL', 'LAX'],
+
+  ['UA', 'SEA'], ['US', 'BOS'], ['AA', 'DFW'], ['UA', 'BOS'], ['AA', 'MIA'], ['B6', 'TPA'],
+
+  ['MQ', 'IND'], ['9E', 'IAD'], ['B6', 'TPA'], ['UA', 'AUS'], ['EV', 'BTV'], ['EV', 'GSP'],
+
+  ['UA', 'ORD'], ['WN', 'MKE'], ['AA', 'STL'], ['AA', 'DFW'], ['MQ', 'CLE'], ['UA', 'LAX'],
+
+  ['UA', 'IAH'], ['UA', 'DEN'], ['9E', 'BWI'], ['DL', 'DEN'], ['9E', 'RIC'], ['MQ', 'DCA'],
+
+  ['UA', 'LAX'], ['B6', 'MCO'], ['US', 'CLT'], ['9E', 'SYR'], ['MQ', 'CLT'], ['MQ', 'RDU'],
+
+  ['EV', 'CVG'], ['AA', 'FLL'], ['MQ', 'PIT'], ['UA', 'LAS'], ['AA', 'SFO'], ['B6', 'FLL'],
+
+  ['DL', 'TPA'], ['MQ', 'XNA'], ['MQ', 'RDU'], ['UA', 'MCO'], ['9E', 'ROC'], ['MQ', 'CMH'],
+
+  ['DL', 'MCO'], ['B6', 'SJU'], ['DL', 'MCO'], ['9E', 'ORD'], ['AA', 'DFW'], ['DL', 'ATL'],
+
+  ['9E', 'MSP'], ['UA', 'CLE'], ['UA', 'RSW'], ['EV', 'PIT'], ['B6', 'RSW'], ['B6', 'ORD'],
+
+  ['DL', 'SAN'], ['DL', 'SLC'], ['DL', 'ATL'], ['EV', 'ROC'], ['DL', 'PDX'], ['AA', 'MIA'],
+
+  ['EV', 'MCI'], ['B6', 'PBI'], ['DL', 'RSW'], ['UA', 'FLL'], ['AA', 'DFW'], ['B6', 'FLL'],
+
+  ['UA', 'MIA'], ['FL', 'ATL'], ['MQ', 'CVG'], ['UA', 'ORD'], ['EV', 'CMH'], ['9E', 'BNA'],
+
+  ['UA', 'BOS'], ['9E', 'BOS'], ['EV', 'GRR'], ['DL', 'LAS'], ['DL', 'MEM'], ['EV', 'MKE'],
+
+  ['MQ', 'RDU'], ['B6', 'SYR'], ['DL', 'FLL'], ['DL', 'ATL'], ['UA', 'PHX'], ['9E', 'PHL'],
+
+  ['AA', 'SFO'], ['EV', 'DCA'], ['AA', 'SJU'], ['B6', 'MCO'], ['EV', 'IAD'], ['9E', 'RDU'],
+
+  ['B6', 'TPA'], ['MQ', 'BNA'], ['9E', 'IND'], ['WN', 'DEN'], ['AA', 'ORD'], ['UA', 'SFO'],
+
+  ['UA', 'IAH'], ['9E', 'MEM'], ['DL', 'DTW'], ['UA', 'RSW'], ['EV', 'IAD'], ['DL', 'SEA'],
+
+  ['B6', 'LAX'], ['DL', 'DTW'], ['UA', 'CLE'], ['DL', 'MSP'], ['VX', 'SFO'], ['DL', 'DEN'],
+
+  ['UA', 'SAN'], ['WN', 'STL'], ['US', 'PHX'], ['EV', 'SDF'], ['B6', 'RSW'], ['DL', 'MIA'],
+
+  ['AA', 'DFW'], ['EV', 'PWM'], ['MQ', 'ORD'], ['UA', 'MCO'], ['UA', 'DEN'], ['AA', 'BOS'],
+
+  ['B6', 'CLT'], ['UA', 'SAT'], ['B6', 'BOS'], ['DL', 'SFO'], ['DL', 'CVG'], ['VX', 'LAX'],
+
+  ['DL', 'AUS'], ['9E', 'CVG'], ['WN', 'STL'], ['AA', 'LAS'], ['B6', 'PBI'], ['MQ', 'DTW'],
+
+  ['B6', 'SAN'], ['UA', 'ORD'], ['EV', 'SAV'], ['AA', 'EGE'], ['US', 'CLT'], ['AA', 'DFW'],
+
+  ['UA', 'IAH'], ['EV', 'BNA'], ['UA', 'DEN'], ['UA', 'LAX'], ['EV', 'ATL'], ['WN', 'MDW'],
+
+  ['B6', 'TPA'], ['MQ', 'ORF'], ['AA', 'AUS'], ['AA', 'LAX'], ['AA', 'ORD'], ['MQ', 'BNA'],
+
+  ['FL', 'ATL'], ['DL', 'FLL'], ['DL', 'ATL'], ['DL', 'SLC'], ['DL', 'LAX'], ['AA', 'MIA'],
+
+  ['UA', 'PDX'], ['US', 'CLT'], ['EV', 'DCA'], ['EV', 'IAD'], ['F9', 'DEN'], ['UA', 'DFW'],
+
+  ['DL', 'ATL'], ['UA', 'IAH'], ['UA', 'SFO'], ['B6', 'BTV'], ['MQ', 'ATL'], ['AA', 'SAN'],
+
+  ['UA', 'SAN'], ['EV', 'CVG'], ['AA', 'ORD'], ['DL', 'PDX'], ['DL', 'SAN'], ['EV', 'DTW'],
+
+  ['MQ', 'XNA'], ['UA', 'MCO'], ['AA', 'DFW'], ['B6', 'MCO'], ['DL', 'DTW'], ['DL', 'MCO'],
+
+  ['EV', 'ALB'], ['UA', 'LAX'], ['MQ', 'RDU'], ['UA', 'ORD'], ['EV', 'BTV'], ['B6', 'BOS'],
+
+  ['B6', 'IAD'], ['WN', 'MDW'], ['WN', 'MDW'], ['AA', 'MCO'], ['B6', 'FLL'], ['EV', 'GSO'],
+
+  ['EV', 'BUF'], ['AA', 'SFO'], ['AA', 'MIA'], ['B6', 'FLL'], ['EV', 'MHT'], ['B6', 'RDU'],
+
+  ['DL', 'ATL'], ['9E', 'PIT'], ['US', 'PHX'], ['DL', 'MSP'], ['UA', 'CLE'], ['EV', 'ATL'],
+
+  ['MQ', 'BNA'], ['MQ', 'CMH'], ['EV', 'RDU'], ['UA', 'LAX'], ['B6', 'PBI'], ['UA', 'ORD'],
+
+  ['EV', 'RIC'], ['AA', 'MIA'], ['B6', 'PHX'], ['WN', 'HOU'], ['WN', 'BWI'], ['B6', 'LGB'],
+
+  ['UA', 'SFO'], ['AS', 'SEA'], ['EV', 'DCA'], ['MQ', 'CLE'], ['9E', 'CHS'], ['DL', 'SEA'],
+
+  ['UA', 'ORD'], ['US', 'CLT'], ['DL', 'MSP'], ['DL', 'DTW'], ['UA', 'SNA'], ['EV', 'BWI'],
+
+  ['UA', 'LAS'], ['DL', 'ATL'], ['B6', 'SJC'], ['UA', 'DEN'], ['MQ', 'BWI'], ['B6', 'MCO'],
+
+  ['DL', 'PIT'], ['UA', 'FLL'], ['US', 'CLT'], ['B6', 'BUR'], ['DL', 'SJU'], ['AA', 'SEA'],
+
+  ['WN', 'BWI'], ['B6', 'OAK'], ['DL', 'BOS'], ['UA', 'SEA'], ['MQ', 'MSP'], ['UA', 'SFO'],
+
+  ['9E', 'CVG'], ['EV', 'STL'], ['9E', 'DFW'], ['AA', 'LAX'], ['EV', 'MCI'], ['AA', 'STL'],
+
+  ['VX', 'SFO'], ['MQ', 'ORD'], ['FL', 'ATL'], ['AA', 'SJU'], ['DL', 'ATL'], ['US', 'DCA'],
+
+  ['EV', 'IAD'], ['DL', 'ATL'], ['DL', 'LAX'], ['WN', 'MKE'], ['B6', 'MCO'], ['B6', 'SJU'],
+
+  ['US', 'CLT'], ['B6', 'BUF'], ['DL', 'BUF'], ['DL', 'MCO'], ['UA', 'PBI'], ['AA', 'DFW'],
+
+  ['DL', 'LAS'], ['EV', 'BNA'], ['AA', 'LAX'], ['AA', 'ORD'], ['DL', 'DEN'], ['UA', 'SFO'],
+
+  ['EV', 'DAY'], ['DL', 'TPA'], ['B6', 'SMF'], ['B6', 'SLC'], ['UA', 'IAH'], ['9E', 'ORD'],
+
+  ['UA', 'PHX'], ['DL', 'MSY'], ['DL', 'PHX'], ['MQ', 'RDU'], ['EV', 'DSM'], ['MQ', 'CRW'],
+
+  ['DL', 'MCO'], ['DL', 'MIA'], ['EV', 'IAD'], ['AA', 'DFW'], ['DL', 'TPA'], ['B6', 'PBI'],
+
+  ['9E', 'SAT'], ['DL', 'SLC'], ['DL', 'PBI'], ['B6', 'MCO'], ['MQ', 'CMH'], ['DL', 'RSW'],
+
+  ['EV', 'CLT'], ['DL', 'SFO'], ['UA', 'BOS'], ['AA', 'TPA'], ['EV', 'OMA'], ['EV', 'RIC'],
+
+  ['9E', 'CLE'], ['UA', 'SEA'], ['UA', 'TPA'], ['EV', 'PWM'], ['9E', 'CVG'], ['9E', 'JAX'],
+
+  ['9E', 'CLT'], ['B6', 'FLL'], ['UA', 'IAH'], ['B6', 'LAS'], ['9E', 'TYS'], ['AA', 'ORD'],
+
+  ['9E', 'RDU'], ['DL', 'ATL'], ['VX', 'LAX'], ['DL', 'DTW'], ['EV', 'TUL'], ['B6', 'SFO'],
+
+  ['UA', 'ORD'], ['9E', 'PHL'], ['AA', 'MIA'], ['UA', 'MIA'], ['MQ', 'DCA'], ['DL', 'FLL'],
+
+  ['EV', 'DCA'], ['WN', 'MDW'], ['MQ', 'ATL'], ['UA', 'CLE'], ['AA', 'BOS'], ['FL', 'CAK'],
+
+  ['B6', 'PDX'], ['B6', 'MSY'], ['MQ', 'CMH'], ['UA', 'DFW'], ['9E', 'PIT'], ['B6', 'FLL'],
+
+  ['DL', 'ATL'], ['EV', 'MKE'], ['DL', 'FLL'], ['B6', 'AUS'], ['UA', 'AUS'], ['B6', 'HOU'],
+
+  ['9E', 'MSY'], ['MQ', 'RDU'], ['UA', 'MCO'], ['9E', 'DCA'], ['UA', 'LAX'], ['EV', 'MHT'],
+
+  ['UA', 'BQN'], ['EV', 'BUF'], ['AA', 'ORD'], ['B6', 'JAX'], ['B6', 'RSW'], ['EV', 'CMH'],
+
+  ['EV', 'BHM'], ['EV', 'TYS'], ['B6', 'LAX'], ['MQ', 'DTW'], ['MQ', 'ORD'], ['EV', 'RDU'],
+
+  ['EV', 'CHS'], ['UA', 'SFO'], ['B6', 'MCO'], ['B6', 'MCO'], ['WN', 'MDW'], ['UA', 'PBI'],
+
+  ['DL', 'LAX'], ['MQ', 'CLT'], ['MQ', 'RDU'], ['UA', 'IAH'], ['UA', 'FLL'], ['UA', 'TPA'],
+
+  ['EV', 'IAD'], ['UA', 'BOS'], ['DL', 'LAS'], ['EV', 'SDF'], ['EV', 'GRR'], ['B6', 'MCO'],
+
+  ['MQ', 'BNA'], ['9E', 'BUF'], ['B6', 'DEN'], ['EV', 'RIC'], ['UA', 'SJU'], ['EV', 'PVD'],
+
+  ['B6', 'TPA'], ['B6', 'FLL'], ['B6', 'LAS'], ['UA', 'DEN'], ['AA', 'LAX'], ['B6', 'SJU'],
+
+  ['B6', 'BUF'], ['B6', 'PBI'], ['B6', 'FLL'], ['DL', 'MIA'], ['UA', 'RSW'], ['EV', 'ALB'],
+
+  ['9E', 'BWI'], ['B6', 'RDU'], ['B6', 'FLL'], ['DL', 'PWM'], ['EV', 'OKC'], ['B6', 'SJU'],
+
+  ['B6', 'PWM'], ['B6', 'ROC'], ['EV', 'PWM'], ['EV', 'BDL'], ['DL', 'ATL'], ['B6', 'BUF'],
+
+  ['EV', 'BWI'], ['MQ', 'DCA'], ['EV', 'BTV'], ['B6', 'MCO'], ['B6', 'BTV'], ['B6', 'PSE'],
+
+  ['B6', 'BQN'], ['EV', 'CVG'], ['EV', 'PIT'], ['EV', 'MHT'], ['EV', 'ATL'], ['EV', 'IND'],
+
+  ['AA', 'LAX'], ['AA', 'DFW'], ['UA', 'ORD'], ['B6', 'SJU'], ['B6', 'BUF'], ['B6', 'BQN'],
+
+  ['US', 'CLT'], ['UA', 'IAH'], ['UA', 'IAH'], ['AA', 'MIA'], ['B6', 'BQN'], ['B6', 'MCO'],
+
+  ['DL', 'DTW'], ['EV', 'IAD'], ['B6', 'FLL'], ['MQ', 'ATL'], ['MQ', 'ORD'], ['EV', 'IAD'],
+
+  ['B6', 'PBI'], ['B6', 'FLL'], ['DL', 'ATL'], ['MQ', 'DTW'], ['US', 'PHL'], ['EV', 'MKE'],
+
+  ['B6', 'PBI'], ['B6', 'TPA'], ['DL', 'DTW'], ['EV', 'IAD'], ['FL', 'ATL'], ['AA', 'ORD'],
+
+  ['UA', 'CLE'], ['WN', 'MDW'], ['WN', 'BWI'], ['UA', 'SFO'], ['AA', 'MIA'], ['AA', 'MIA'],
+
+  ['B6', 'RSW'], ['EV', 'MSP'], ['DL', 'ATL'], ['DL', 'ATL'], ['MQ', 'RDU'], ['US', 'CLT'],
+
+  ['DL', 'MSP'], ['UA', 'LAX'], ['B6', 'SJU'], ['AA', 'SJU'], ['UA', 'PBI'], ['AA', 'DFW'],
+
+  ['B6', 'FLL'], ['DL', 'MSY'], ['US', 'CLT'], ['UA', 'PHX'], ['US', 'PHX'], ['EV', 'CLT'],
+
+  ['UA', 'MIA'], ['US', 'CLT'], ['EV', 'RDU'], ['UA', 'BOS'], ['MQ', 'CLT'], ['EV', 'PIT'],
+
+  ['US', 'PHX'], ['WN', 'BWI'], ['UA', 'AUS'], ['AA', 'DFW'], ['UA', 'SFO'], ['EV', 'IND'],
+
+  ['UA', 'IAH'], ['EV', 'BNA'], ['B6', 'BOS'], ['EV', 'BUF'], ['EV', 'SDF'], ['B6', 'BUF'],
+
+  ['US', 'CLT'], ['B6', 'MCO'], ['UA', 'DEN'], ['DL', 'SLC'], ['DL', 'SFO'], ['DL', 'MCO'],
+
+  ['UA', 'LAS'], ['DL', 'ATL'], ['DL', 'MIA'], ['US', 'DCA'], ['DL', 'LAX'], ['EV', 'MSY'],
+
+  ['AA', 'MCO'], ['B6', 'FLL'], ['B6', 'LAS'], ['DL', 'FLL'], ['VX', 'LAX'], ['UA', 'ORD'],
+
+  ['EV', 'DTW'], ['B6', 'LAX'], ['UA', 'SNA'], ['UA', 'DEN'], ['MQ', 'XNA'], ['B6', 'MSY'],
+
+  ['UA', 'FLL'], ['WN', 'HOU'], ['UA', 'LAX'], ['UA', 'MCO'], ['B6', 'SJU'], ['UA', 'ORD'],
+
+  ['AA', 'MIA'], ['AA', 'FLL'], ['FL', 'MKE'], ['EV', 'CVG'], ['UA', 'RSW'], ['DL', 'DTW'],
+
+  ['UA', 'SFO'], ['B6', 'MCO'], ['MQ', 'ORD'], ['UA', 'PBI'], ['AS', 'SEA'], ['B6', 'RSW'],
+
+  ['AA', 'DFW'], ['VX', 'SFO'], ['B6', 'ROC'], ['DL', 'ATL'], ['AA', 'LAX'], ['UA', 'IAH'],
+
+  ['B6', 'SYR'], ['DL', 'SEA'], ['UA', 'IAH'], ['EV', 'ATL'], ['UA', 'TPA'], ['AA', 'SFO'],
+
+  ['B6', 'SFO'], ['B6', 'TPA'], ['UA', 'ORD'], ['9E', 'PIT'], ['9E', 'CVG'], ['DL', 'MSP'],
+
+  ['DL', 'ATL'], ['EV', 'MSP'], ['B6', 'MCO'], ['UA', 'SJU'], ['DL', 'MIA'], ['WN', 'DEN'],
+
+  ['UA', 'SFO'], ['UA', 'DFW'], ['9E', 'MSP'], ['B6', 'FLL'], ['DL', 'FLL'], ['WN', 'PHX'],
+
+  ['US', 'CLT'], ['EV', 'OMA'], ['MQ', 'RDU'], ['UA', 'DEN'], ['B6', 'SRQ'], ['FL', 'ATL'],
+
+  ['B6', 'BOS'], ['AA', 'BOS'], ['AA', 'STT'], ['DL', 'MCO'], ['DL', 'TPA'], ['B6', 'PIT'],
+
+  ['DL', 'TPA'], ['DL', 'ATL'], ['DL', 'LAS'], ['MQ', 'CMH'], ['US', 'CLT'], ['9E', 'ORD'],
+
+  ['DL', 'DEN'], ['EV', 'MHT'], ['MQ', 'BNA'], ['MQ', 'DCA'], ['US', 'CLT'], ['EV', 'MEM'],
+
+  ['9E', 'RDU'], ['EV', 'GSO'], ['UA', 'LAX'], ['B6', 'ORD'], ['DL', 'PBI'], ['UA', 'FLL'],
+
+  ['DL', 'SJU'], ['UA', 'MCO'], ['EV', 'JAX'], ['EV', 'GRR'], ['EV', 'MYR'], ['MQ', 'ATL'],
+
+  ['EV', 'RDU'], ['F9', 'DEN'], ['WN', 'MDW'], ['EV', 'RIC'], ['9E', 'DCA'], ['9E', 'BOS'],
+
+  ['B6', 'JAX'], ['B6', 'SAN'], ['UA', 'SFO'], ['UA', 'BOS'], ['B6', 'RSW'], ['MQ', 'CLE'],
+
+  ['B6', 'SJU'], ['UA', 'SAN'], ['B6', 'TPA'], ['EV', 'XNA'], ['EV', 'DTW'], ['EV', 'IND'],
+
+  ['EV', 'PWM'], ['AA', 'MIA'], ['DL', 'DTW'], ['9E', 'DTW'], ['DL', 'ATL'], ['US', 'CLT'],
+
+  ['AA', 'ORD'], ['EV', 'MCI'], ['AA', 'LAX'], ['DL', 'LAX'], ['EV', 'CVG'], ['EV', 'DAY'],
+
+  ['DL', 'ATL'], ['DL', 'MCO'], ['MQ', 'DTW'], ['VX', 'LAX'], ['UA', 'DEN'], ['9E', 'BWI'],
+
+  ['AA', 'MIA'], ['UA', 'IAH']]
+
+};
+
+
+
+// Call Code to Build the system ///////////////////////////////////////////////////////////////////
+
+
+
+var v  = new BrunelVis('visualization');
+
+v.build(table1);
+
 
 </script>
 </body>
