@@ -5,8 +5,8 @@
 <link rel="stylesheet" type="text/css" href="https://model-viewer-qa.mybluemix.net/mdlvr/assets/1.0.0/stylesheets/light/looks.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.1/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
-<script src="http://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
-<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/jquery-1.10.2.js" charset="utf-8"></script>
+<script src="https://code.jquery.com/ui/1.11.4/jquery-ui.js" charset="utf-8"></script>
 <script src="https://brunelvis.org/js/brunel.2.4.min.js"</script>
 <script src="https://brunelvis.org/js/brunel.controls.2.4.min.js"</script>
 <style>
@@ -15,190 +15,374 @@
 <body>
 <svg id="visualization" width="600" height="600"></svg>
 <script>
-function  BrunelVis(visId) {
-  "use strict";                                                                       // strict mode
-  var datasets = [],                                      // array of datasets for the original data
-      pre = function(d, i) { return d },                         // default pre-process does nothing
-      post = function(d, i) { return d },                       // default post-process does nothing
-      transitionTime = 200,                                        // transition time for animations
-      charts = [],                                                       // the charts in the system
-      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
-
-  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
-
-  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
-
-  charts[0] = function(parentNode, filterRows) {
-    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 49, 37, 55),
-      elements = [];                                              // array of elements in this chart
-
-    // Define groups for the chart parts ///////////////////////////////////////////////////////////
-
-    var chart =  vis.append('g').attr('class', 'chart1')
-      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
-    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
-    var zoom = d3.zoom().scaleExtent([1/3,3]);
-    var zoomNode = overlay.append('rect').attr('class', 'overlay')
-      .attr('x', geom.inner_left).attr('y', geom.inner_top)
-      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
-      .style('cursor', 'move').call(zoom)
-      .node();
-    zoomNode.__zoom = d3.zoomIdentity;
-    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
-    var interior = chart.append('g').attr('class', 'interior zoomNone')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
-    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
-    var gridGroup = interior.append('g').attr('class', 'grid');
-    var axes = chart.append('g').attr('class', 'axis')
-      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
-    var legends = chart.append('g').attr('class', 'legend')
-      .attr('transform','translate(' + (geom.chart_right-geom.chart_left - 3) + ',' + 0 + ')');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
-      .attr('x', 0).attr('y', 0)
-      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
-
-    // Scales //////////////////////////////////////////////////////////////////////////////////////
-
-    var scale_x = d3.scaleLinear().domain([0, 700.00007])
-      .range([0, geom.inner_width]);
-    var scale_inner = d3.scaleLinear().domain([0,1])
-      .range([-0.5, 0.5]);
-    var scale_y = d3.scaleSqrt().domain([0, 6000.0006])
-      .range([geom.inner_height, 0]);
-    var base_scales = [scale_x, scale_y];                           // untransformed original scales
-
-    // Axes ////////////////////////////////////////////////////////////////////////////////////////
-
-    axes.append('g').attr('class', 'x axis')
-      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
-      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
-      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
-    axes.select('g.axis.x').append('text').attr('class', 'title').text('air_time').style('text-anchor', 'middle')
-      .attr('x',geom.inner_rawWidth/2)
-      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
-    axes.append('g').attr('class', 'y axis')
-      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
-    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
-      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
-    axes.select('g.axis.y').append('text').attr('class', 'title').text('distance').style('text-anchor', 'middle')
-      .attr('x',-geom.inner_rawHeight/2)
-      .attr('y', 4-geom.inner_left).attr('dy', '0.7em').attr('transform', 'rotate(270)');
-
-    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 33.0)));
-    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
-
-    function buildAxes(time) {
-      var axis_x = axes.select('g.axis.x');
-      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x));
-      var axis_y = axes.select('g.axis.y');
-      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
-    }
-    zoom.on('zoom', function(t, time) {
-        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
-        scale_x = t.rescaleX(base_scales[0]);
-        scale_y = t.rescaleY(base_scales[1]);
-        zoomNode.__zoom = t;
-        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
-        build(time || -1);
-    });
-
-    // Define element #1 ///////////////////////////////////////////////////////////////////////////
-
-    elements[0] = function() {
-      var original, processed,                           // data sets passed in and then transformed
-        element, data,                                 // brunel element information and brunel data
-        selection, merged;                                      // d3 selection and merged selection
-      var elementGroup = interior.append('g').attr('class', 'element1'),
-        main = elementGroup.append('g').attr('class', 'main'),
-        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
-
-      function makeData() {
-        original = datasets[0];
-        if (filterRows) original = original.retainRows(filterRows);
-        processed = pre(original, 0)
-          .filter('air_time valid');
-        processed = post(processed, 0);
-        var f0 = processed.field('air_time'),
-          f1 = processed.field('distance'),
-          f2 = processed.field('carrier'),
-          f3 = processed.field('#row'),
-          f4 = processed.field('#selection');
-        var keyFunc = function(d) { return f3.value(d) };
-        data = {
-          air_time:     function(d) { return f0.value(d.row) },
-          distance:     function(d) { return f1.value(d.row) },
-          carrier:      function(d) { return f2.value(d.row) },
-          $row:         function(d) { return f3.value(d.row) },
-          $selection:   function(d) { return f4.value(d.row) },
-          air_time_f:   function(d) { return f0.valueFormatted(d.row) },
-          distance_f:   function(d) { return f1.valueFormatted(d.row) },
-          carrier_f:    function(d) { return f2.valueFormatted(d.row) },
-          $row_f:       function(d) { return f3.valueFormatted(d.row) },
-          $selection_f: function(d) { return f4.valueFormatted(d.row) },
-          _split:       function(d) { return f2.value(d.row)+ '|' + f2.value(d.row) },
-          _key:         keyFunc,
-          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
-        };
-      }
-      // Aesthetic Functions
-      var scale_color = d3.scaleOrdinal()
-        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
-        .range([ '#00538A', '#C10020', '#F4C800', '#007D34', '#803E75', '#FF6800', 
-          '#817066', '#FFB300', '#F6768E', '#93AA00', '#53377A', '#FF8E00', '#B32851', 
-          '#CEA262', '#FF7A5C', '#7F180D', '#593315', '#F13A13', '#232C16']);
-      var color = function(d) { return scale_color(data.carrier(d)) };
-      var scale_symbol = d3.scaleOrdinal()
-        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
-        .range([ '_sym_circle', '_sym_square', '_sym_triangle', '_sym_diamond', 
-          '_sym_cross', '_sym_pentagon', '_sym_star', '_sym_hexagon']);
-      var symbolID = function(d) { var sym =data.carrier(d); return sym ? scale_symbol(sym) : '_sym_circle' };
-      legends._legend = legends._legend || { title: ['carrier'], 
-        ticks: scale_color.domain()};
-      legends._legend.color = scale_color;
-      legends._legend.symbol = scale_symbol;
-
-      // Build element from data ///////////////////////////////////////////////////////////////////
-
-      function build(transitionMillis) {
-        element = elements[0];
-        var w = 3.01 * geom.default_point_size;
-        var x = function(d) { return scale_x(data.air_time(d))};
-        var h = w;
-        var y = function(d) { return scale_y(data.distance(d))};
-
-        // Define selection entry operations
-        function initialState(selection) {
-          selection
-            .attr('class', 'element point filled')
-        }
-
-        // Define selection update operations on merged data
-        function updateState(selection) {
-          selection
-            .attr('xlink:href', function(d) { return '#' + symbolID(d) })
-            .each(function(d) {
-              var width = w, left = x(d) - width/2, 
-              height = h, top = y(d) - height/2;
-              this.r = {x:left, y:top, w:width, h:height};
-            })
-            .attr('x', function(d) { return this.r.x })
-            .attr('y', function(d) { return this.r.y })
-            .attr('width', function(d) { return this.r.w })
-            .attr('height', function(d) { return this.r.h })
-            .filter(BrunelD3.hasData)                     // following only performed for data items
-            .style('fill', color)
-            .attr('xlink:href', function(d) { return '#' + symbolID(d) });
-        }
-
-        // Define labeling for the selection
-        function label(selection, transitionMillis) {
-
-          var tooltipLabeling  = {
-            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
-            fit: true, granularity: 0,
-            content: function(d) {
+function  BrunelVis(visId) {
+
+  "use strict";                                                                       // strict mode
+
+  var datasets = [],                                      // array of datasets for the original data
+
+      pre = function(d, i) { return d },                         // default pre-process does nothing
+
+      post = function(d, i) { return d },                       // default post-process does nothing
+
+      transitionTime = 200,                                        // transition time for animations
+
+      charts = [],                                                       // the charts in the system
+
+      vis = d3.select('#' + visId).attr('class', 'brunel');                     // the SVG container
+
+
+
+  BrunelD3.addDefinitions(vis);                                   // ensure standard symbols present
+
+
+
+  // Define chart #1 in the visualization //////////////////////////////////////////////////////////
+
+
+
+  charts[0] = function(parentNode, filterRows) {
+
+    var geom = BrunelD3.geometry(parentNode || vis.node(), 0, 0, 1, 1, 5, 49, 37, 55),
+
+      elements = [];                                              // array of elements in this chart
+
+
+
+    // Define groups for the chart parts ///////////////////////////////////////////////////////////
+
+
+
+    var chart =  vis.append('g').attr('class', 'chart1')
+
+      .attr('transform','translate(' + geom.chart_left + ',' + geom.chart_top + ')');
+
+    var overlay = chart.append('g').attr('class', 'element').attr('class', 'overlay');
+
+    var zoom = d3.zoom().scaleExtent([1/3,3]);
+
+    var zoomNode = overlay.append('rect').attr('class', 'overlay')
+
+      .attr('x', geom.inner_left).attr('y', geom.inner_top)
+
+      .attr('width', geom.inner_rawWidth).attr('height', geom.inner_rawHeight)
+
+      .style('cursor', 'move').call(zoom)
+
+      .node();
+
+    zoomNode.__zoom = d3.zoomIdentity;
+
+    chart.append('rect').attr('class', 'background').attr('width', geom.chart_right-geom.chart_left).attr('height', geom.chart_bottom-geom.chart_top);
+
+    var interior = chart.append('g').attr('class', 'interior zoomNone')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_inner)');
+
+    interior.append('rect').attr('class', 'inner').attr('width', geom.inner_width).attr('height', geom.inner_height);
+
+    var gridGroup = interior.append('g').attr('class', 'grid');
+
+    var axes = chart.append('g').attr('class', 'axis')
+
+      .attr('transform','translate(' + geom.inner_left + ',' + geom.inner_top + ')');
+
+    var legends = chart.append('g').attr('class', 'legend')
+
+      .attr('transform','translate(' + (geom.chart_right-geom.chart_left - 3) + ',' + 0 + ')');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_inner').append('rect')
+
+      .attr('x', 0).attr('y', 0)
+
+      .attr('width', geom.inner_rawWidth+1).attr('height', geom.inner_rawHeight+1);
+
+
+
+    // Scales //////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    var scale_x = d3.scaleLinear().domain([0, 700.00007])
+
+      .range([0, geom.inner_width]);
+
+    var scale_inner = d3.scaleLinear().domain([0,1])
+
+      .range([-0.5, 0.5]);
+
+    var scale_y = d3.scaleSqrt().domain([0, 6000.0006])
+
+      .range([geom.inner_height, 0]);
+
+    var base_scales = [scale_x, scale_y];                           // untransformed original scales
+
+
+
+    // Axes ////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    axes.append('g').attr('class', 'x axis')
+
+      .attr('transform','translate(0,' + geom.inner_rawHeight + ')')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_haxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_haxis').append('polyline')
+
+      .attr('points', '-1,-1000, -1,-1 -5,5, -1000,5, -100,1000, 10000,1000 10000,-1000');
+
+    axes.select('g.axis.x').append('text').attr('class', 'title').text('air_time').style('text-anchor', 'middle')
+
+      .attr('x',geom.inner_rawWidth/2)
+
+      .attr('y', geom.inner_bottom - 2.0).attr('dy','-0.27em');
+
+    axes.append('g').attr('class', 'y axis')
+
+      .attr('clip-path', 'url(#clip_visualization_chart1_vaxis)');
+
+    vis.select('defs').append('clipPath').attr('id', 'clip_visualization_chart1_vaxis').append('polyline')
+
+      .attr('points', '-1000,-10000, 10000,-10000, 10000,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+1) + ', -1,' + (geom.inner_rawHeight+5) + ', -1000,' + (geom.inner_rawHeight+5) );
+
+    axes.select('g.axis.y').append('text').attr('class', 'title').text('distance').style('text-anchor', 'middle')
+
+      .attr('x',-geom.inner_rawHeight/2)
+
+      .attr('y', 4-geom.inner_left).attr('dy', '0.7em').attr('transform', 'rotate(270)');
+
+
+
+    var axis_bottom = d3.axisBottom(scale_x).ticks(Math.min(10, Math.round(geom.inner_width / 33.0)));
+
+    var axis_left = d3.axisLeft(scale_y).ticks(Math.min(10, Math.round(geom.inner_width / 20)));
+
+
+
+    function buildAxes(time) {
+
+      var axis_x = axes.select('g.axis.x');
+
+      BrunelD3.transition(axis_x, time).call(axis_bottom.scale(scale_x));
+
+      var axis_y = axes.select('g.axis.y');
+
+      BrunelD3.transition(axis_y, time).call(axis_left.scale(scale_y));
+
+    }
+
+    zoom.on('zoom', function(t, time) {
+
+        t = t ||BrunelD3.restrictZoom(d3.event.transform, geom, this);
+
+        scale_x = t.rescaleX(base_scales[0]);
+
+        scale_y = t.rescaleY(base_scales[1]);
+
+        zoomNode.__zoom = t;
+
+        interior.attr('class', 'interior ' + BrunelD3.zoomLabel(t.k));;
+
+        build(time || -1);
+
+    });
+
+
+
+    // Define element #1 ///////////////////////////////////////////////////////////////////////////
+
+
+
+    elements[0] = function() {
+
+      var original, processed,                           // data sets passed in and then transformed
+
+        element, data,                                 // brunel element information and brunel data
+
+        selection, merged;                                      // d3 selection and merged selection
+
+      var elementGroup = interior.append('g').attr('class', 'element1'),
+
+        main = elementGroup.append('g').attr('class', 'main'),
+
+        labels = BrunelD3.undoTransform(elementGroup.append('g').attr('class', 'labels').attr('aria-hidden', 'true'), elementGroup);
+
+
+
+      function makeData() {
+
+        original = datasets[0];
+
+        if (filterRows) original = original.retainRows(filterRows);
+
+        processed = pre(original, 0)
+
+          .filter('air_time valid');
+
+        processed = post(processed, 0);
+
+        var f0 = processed.field('air_time'),
+
+          f1 = processed.field('distance'),
+
+          f2 = processed.field('carrier'),
+
+          f3 = processed.field('#row'),
+
+          f4 = processed.field('#selection');
+
+        var keyFunc = function(d) { return f3.value(d) };
+
+        data = {
+
+          air_time:     function(d) { return f0.value(d.row) },
+
+          distance:     function(d) { return f1.value(d.row) },
+
+          carrier:      function(d) { return f2.value(d.row) },
+
+          $row:         function(d) { return f3.value(d.row) },
+
+          $selection:   function(d) { return f4.value(d.row) },
+
+          air_time_f:   function(d) { return f0.valueFormatted(d.row) },
+
+          distance_f:   function(d) { return f1.valueFormatted(d.row) },
+
+          carrier_f:    function(d) { return f2.valueFormatted(d.row) },
+
+          $row_f:       function(d) { return f3.valueFormatted(d.row) },
+
+          $selection_f: function(d) { return f4.valueFormatted(d.row) },
+
+          _split:       function(d) { return f2.value(d.row)+ '|' + f2.value(d.row) },
+
+          _key:         keyFunc,
+
+          _rows:        BrunelD3.makeRowsWithKeys(keyFunc, processed.rowCount())
+
+        };
+
+      }
+
+      // Aesthetic Functions
+
+      var scale_color = d3.scaleOrdinal()
+
+        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
+
+        .range([ '#00538A', '#C10020', '#F4C800', '#007D34', '#803E75', '#FF6800', 
+
+          '#817066', '#FFB300', '#F6768E', '#93AA00', '#53377A', '#FF8E00', '#B32851', 
+
+          '#CEA262', '#FF7A5C', '#7F180D', '#593315', '#F13A13', '#232C16']);
+
+      var color = function(d) { return scale_color(data.carrier(d)) };
+
+      var scale_symbol = d3.scaleOrdinal()
+
+        .domain(['9E', 'AA', 'AS', 'B6', 'DL', 'EV', 'F9', 'FL', 'HA', 'MQ', 'UA', 'US', 'VX', 'WN'])
+
+        .range([ '_sym_circle', '_sym_square', '_sym_triangle', '_sym_diamond', 
+
+          '_sym_cross', '_sym_pentagon', '_sym_star', '_sym_hexagon']);
+
+      var symbolID = function(d) { var sym =data.carrier(d); return sym ? scale_symbol(sym) : '_sym_circle' };
+
+      legends._legend = legends._legend || { title: ['carrier'], 
+
+        ticks: scale_color.domain()};
+
+      legends._legend.color = scale_color;
+
+      legends._legend.symbol = scale_symbol;
+
+
+
+      // Build element from data ///////////////////////////////////////////////////////////////////
+
+
+
+      function build(transitionMillis) {
+
+        element = elements[0];
+
+        var w = 3.01 * geom.default_point_size;
+
+        var x = function(d) { return scale_x(data.air_time(d))};
+
+        var h = w;
+
+        var y = function(d) { return scale_y(data.distance(d))};
+
+
+
+        // Define selection entry operations
+
+        function initialState(selection) {
+
+          selection
+
+            .attr('class', 'element point filled')
+
+        }
+
+
+
+        // Define selection update operations on merged data
+
+        function updateState(selection) {
+
+          selection
+
+            .attr('xlink:href', function(d) { return '#' + symbolID(d) })
+
+            .each(function(d) {
+
+              var width = w, left = x(d) - width/2, 
+
+              height = h, top = y(d) - height/2;
+
+              this.r = {x:left, y:top, w:width, h:height};
+
+            })
+
+            .attr('x', function(d) { return this.r.x })
+
+            .attr('y', function(d) { return this.r.y })
+
+            .attr('width', function(d) { return this.r.w })
+
+            .attr('height', function(d) { return this.r.h })
+
+            .filter(BrunelD3.hasData)                     // following only performed for data items
+
+            .style('fill', color)
+
+            .attr('xlink:href', function(d) { return '#' + symbolID(d) });
+
+        }
+
+
+
+        // Define labeling for the selection
+
+        function label(selection, transitionMillis) {
+
+
+
+          var tooltipLabeling  = {
+
+            index: -1, method: 'box', location: ['center', 'top'], inside: true, align: 'middle', pad: 0, dy: 0.7,
+
+            fit: true, granularity: 0,
+
+            content: function(d) {
+
               return d.row == null ? null : '<span class="title">air_time: </span>'
 			+ '<span class="field">' + data.air_time_f(d) + '</span>'
 			+ '<br/>'
@@ -206,502 +390,998 @@ function  BrunelVis(visId) {
 			+ '<span class="field">' + data.distance_f(d) + '</span>'
 			+ '<br/>'
 			+ '<span class="title">carrier: </span>'
-			+ '<span class="field">' + data.carrier_f(d) + '</span>'
-            }
-          };
-          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
-        }
-        // Create selections, set the initial state and transition updates
-        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
-        var added = selection.enter().append('use');
-        merged = selection.merge(added);
-        initialState(added);
-        selection.filter(BrunelD3.hasData)
-          .classed('selected', BrunelD3.isSelected(data))
-          .filter(BrunelD3.isSelected(data)).raise();
-        updateState(BrunelD3.transition(merged, transitionMillis));
-        label(merged, transitionMillis);
-
-        BrunelD3.transition(selection.exit(), transitionMillis/3)
-          .style('opacity', 0.5).each( function() {
-            this.remove(); BrunelD3.removeLabels(this); 
-        });
-      }
-
-      return {
-        data:           function() { return processed },
-        original:       function() { return original },
-        internal:       function() { return data },
-        selection:      function() { return merged },
-        makeData:       makeData,
-        build:          build,
-        chart:          function() { return charts[0] },
-        group:          function() { return elementGroup },
-        fields: {
-          x:            ['air_time'],
-          y:            ['distance'],
-          key:          ['#row'],
-          color:        ['carrier'],
-          symbol:       ['carrier']
-        }
-      };
-    }();
-
-    function build(time, noData) {
-      var first = elements[0].data() == null;
-      if (first) time = 0;                                           // no transition for first call
-      buildAxes(time);
-      if ((first || time > -1) && !noData) {
-        elements[0].makeData();
-        BrunelD3.addLegend(legends, legends._legend);
-      }
-      elements[0].build(time);
-    }
-
-    // Expose the following components of the chart
-    return {
-      elements : elements,
-      interior : interior,
-      scales: {x:scale_x, y:scale_y},
-      zoom: function(params, time) {
-          if (params) zoom.on('zoom').call(zoomNode, params, time);
-          return d3.zoomTransform(zoomNode);
-      },
-      build : build
-    };
-    }();
-
-  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
-  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
-  function buildAll() {
-    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
-    updateAll(transitionTime);
-  }
-
-  return {
-    dataPreProcess:     function(f) { if (f) pre = f; return pre },
-    dataPostProcess:    function(f) { if (f) post = f; return post },
-    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
-    visId:              visId,
-    build:              buildAll,
-    rebuild:            updateAll,
-    charts:             charts
-  }
-}
-
-// Data Tables /////////////////////////////////////////////////////////////////////////////////////
-
-var table1 = {
-   summarized: false,
-   names: ['air_time', 'distance', 'carrier'], 
-   options: ['numeric', 'numeric', 'string'], 
-   rows: [[227, 1400, 'UA'], [227, 1416, 'UA'], [160, 1089, 'AA'], [183, 1576, 'B6'],
-  [116, 762, 'DL'], [150, 719, 'UA'], [158, 1065, 'B6'], [53, 229, 'EV'], [140, 944, 'B6'],
-  [138, 733, 'AA'], [149, 1028, 'B6'], [158, 1005, 'B6'], [345, 2475, 'UA'], [361, 2565, 'UA'],
-  [257, 1389, 'AA'], [44, 187, 'B6'], [337, 2227, 'UA'], [152, 1076, 'B6'], [134, 762, 'MQ'],
-  [147, 1023, 'B6'], [170, 1020, 'DL'], [105, 502, 'MQ'], [152, 1085, 'AA'], [128, 760, 'DL'],
-  [157, 1085, 'UA'], [139, 719, 'MQ'], [366, 2586, 'UA'], [175, 1074, 'B6'], [182, 1598, 'B6'],
-  [120, 746, 'DL'], [342, 2133, 'US'], [153, 1096, 'AA'], [229, 1416, 'UA'], [190, 1008, 'EV'],
-  [166, 1020, 'MQ'], [330, 2153, 'US'], [192, 1598, 'AA'], [366, 2454, 'UA'], [140, 733, 'AA'],
-  [40, 185, 'WN'], [91, 529, 'US'], [52, 212, 'EV'], [248, 1389, 'AA'], [144, 950, 'B6'],
-  [41, 187, 'B6'], [146, 1023, 'UA'], [91, 529, 'US'], [151, 1065, 'UA'], [63, 301, 'B6'],
-  [243, 1620, 'UA'], [380, 2434, 'UA'], [323, 2248, 'B6'], [191, 1182, 'B6'], [149, 1035, 'DL'],
-  [294, 1990, 'DL'], [362, 2586, 'DL'], [161, 1096, 'DL'], [143, 733, 'AA'], [142, 944, 'AA'],
-  [233, 1147, 'MQ'], [156, 997, 'UA'], [164, 1076, 'DL'], [126, 762, 'DL'], [361, 2475, 'VX'],
-  [159, 1096, 'AA'], [156, 1069, 'B6'], [105, 502, 'DL'], [164, 1068, 'UA'], [188, 1608, 'UA'],
-  [381, 2475, 'B6'], [135, 733, 'UA'], [190, 1598, 'B6'], [159, 1069, 'AA'], [156, 719, 'UA'],
-  [134, 738, 'FL'], [147, 944, 'B6'], [153, 1023, 'UA'], [254, 1389, 'AA'], [338, 2402, 'AS'],
-  [238, 1372, 'AA'], [254, 1605, 'UA'], [238, 1416, 'UA'], [356, 2586, 'VX'], [64, 264, 'B6'],
-  [167, 1080, 'B6'], [145, 937, 'UA'], [54, 209, 'B6'], [350, 2586, 'B6'], [137, 733, 'AA'],
-  [249, 1400, 'UA'], [158, 1010, 'B6'], [358, 2475, 'AA'], [164, 1041, 'B6'], [349, 2422, 'DL'],
-  [378, 2586, 'AA'], [373, 2565, 'UA'], [148, 719, 'MQ'], [140, 950, 'DL'], [249, 1620, 'UA'],
-  [96, 544, 'US'], [157, 1096, 'AA'], [126, 762, 'DL'], [279, 1620, 'WN'], [142, 937, 'B6'],
-  [158, 1089, 'DL'], [171, 1020, 'DL'], [80, 427, 'MQ'], [38, 200, 'B6'], [38, 187, 'AA'],
-  [369, 2586, 'UA'], [147, 944, 'DL'], [98, 541, 'B6'], [165, 1069, 'B6'], [101, 479, 'MQ'],
-  [126, 760, 'DL'], [132, 820, 'EV'], [189, 1029, '9E'], [149, 1035, 'DL'], [101, 628, 'EV'],
-  [118, 544, 'MQ'], [96, 529, 'US'], [180, 946, 'EV'], [267, 1620, 'DL'], [132, 762, 'FL'],
-  [86, 340, 'B6'], [190, 1598, 'B6'], [36, 187, 'DL'], [182, 1598, 'DL'], [354, 2446, 'B6'],
-  [52, 213, 'MQ'], [91, 419, 'EV'], [96, 541, 'US'], [250, 1372, 'UA'], [169, 888, 'AA'],
-  [130, 828, 'B6'], [160, 1089, 'AA'], [357, 2565, 'UA'], [160, 740, 'B6'], [359, 2454, 'UA'],
-  [360, 2475, 'UA'], [145, 937, 'UA'], [137, 733, 'AA'], [123, 762, 'MQ'], [92, 550, 'EV'],
-  [77, 431, 'MQ'], [257, 1620, 'F9'], [249, 1389, 'AA'], [88, 419, 'MQ'], [188, 1598, 'AA'],
-  [108, 509, 'DL'], [157, 1068, 'B6'], [41, 184, 'MQ'], [275, 1874, 'UA'], [75, 416, 'EV'],
-  [106, 488, 'DL'], [367, 2425, 'UA'], [146, 711, 'WN'], [159, 1005, 'B6'], [129, 762, 'DL'],
-  [358, 2475, 'AA'], [158, 1096, 'DL'], [150, 1023, 'UA'], [659, 4983, 'HA'], [110, 502, 'DL'],
-  [125, 746, 'DL'], [343, 2402, 'UA'], [103, 502, 'MQ'], [140, 950, 'DL'], [359, 2475, 'VX'],
-  [161, 1065, 'UA'], [145, 719, 'UA'], [142, 764, 'MQ'], [158, 1085, 'UA'], [263, 1521, 'B6'],
-  [246, 1605, 'UA'], [52, 266, 'B6'], [32, 96, 'US'], [233, 1400, 'UA'], [184, 1623, 'AA'],
-  [166, 1089, 'AA'], [159, 1085, 'UA'], [189, 1634, 'UA'], [238, 1372, 'AA'], [85, 404, 'UA'],
-  [258, 1389, 'AA'], [145, 944, 'B6'], [80, 427, 'B6'], [52, 228, 'B6'], [92, 544, 'MQ'],
-  [333, 2475, 'DL'], [38, 187, 'B6'], [191, 1608, 'B6'], [151, 1028, 'B6'], [287, 1726, 'UA'],
-  [166, 1080, 'DL'], [43, 199, 'EV'], [264, 1605, 'WN'], [149, 997, 'UA'], [161, 1076, 'B6'],
-  [154, 733, 'UA'], [324, 2248, 'VX'], [66, 301, 'B6'], [170, 1069, 'B6'], [145, 725, 'WN'],
-  [159, 1010, 'DL'], [169, 1047, 'DL'], [154, 1035, 'B6'], [143, 738, 'WN'], [133, 733, 'AA'],
-  [129, 762, 'MQ'], [352, 2475, 'B6'], [105, 583, 'EV'], [47, 273, 'B6'], [170, 872, 'EV'],
-  [144, 764, 'MQ'], [346, 2454, 'UA'], [324, 2133, 'US'], [129, 762, 'DL'], [37, 200, 'UA'],
-  [151, 1076, 'DL'], [90, 544, 'US'], [152, 1065, 'B6'], [342, 2153, 'US'], [254, 1605, 'UA'],
-  [131, 719, 'MQ'], [160, 1020, 'DL'], [90, 529, 'US'], [97, 541, 'US'], [59, 229, 'EV'],
-  [320, 2248, 'DL'], [129, 762, 'FL'], [59, 282, 'EV'], [78, 431, 'MQ'], [247, 1389, 'AA'],
-  [137, 937, 'UA'], [356, 2475, 'AA'], [237, 1416, 'UA'], [389, 2586, 'AA'], [100, 628, 'EV'],
-  [363, 2586, 'VX'], [157, 1065, 'UA'], [135, 645, 'EV'], [42, 200, 'UA'], [133, 733, 'AA'],
-  [149, 719, 'UA'], [142, 944, 'B6'], [151, 725, 'EV'], [229, 1400, 'UA'], [157, 1068, 'UA'],
-  [230, 1389, 'AA'], [295, 1990, 'DL'], [112, 502, 'MQ'], [165, 1076, 'B6'], [129, 762, 'DL'],
-  [51, 284, 'EV'], [158, 1010, 'DL'], [50, 214, 'US'], [43, 185, 'WN'], [50, 213, 'MQ'],
-  [325, 2227, 'UA'], [145, 1023, 'B6'], [155, 1096, 'DL'], [356, 2565, 'UA'], [95, 479, 'MQ'],
-  [157, 1096, 'AA'], [52, 266, 'B6'], [364, 2586, 'UA'], [104, 502, 'DL'], [248, 1416, 'UA'],
-  [117, 708, 'EV'], [176, 888, 'WN'], [256, 1620, 'UA'], [349, 2586, 'B6'], [169, 1080, 'DL'],
-  [94, 544, 'US'], [73, 416, 'EV'], [357, 2475, 'UA'], [156, 1023, 'UA'], [156, 997, 'UA'],
-  [127, 733, 'AA'], [166, 1020, 'DL'], [89, 419, 'MQ'], [168, 1074, 'B6'], [347, 2475, 'VX'],
-  [156, 1085, 'AA'], [153, 1035, 'DL'], [371, 2434, 'UA'], [126, 746, 'EV'], [82, 397, 'FL'],
-  [46, 195, 'EV'], [95, 463, 'EV'], [167, 1069, 'B6'], [330, 2475, 'DL'], [40, 200, 'B6'],
-  [141, 762, 'MQ'], [353, 2475, 'AA'], [160, 1076, 'DL'], [133, 762, 'DL'], [57, 213, 'MQ'],
-  [50, 246, 'EV'], [80, 431, 'MQ'], [151, 937, 'UA'], [248, 1389, 'AA'], [38, 169, 'WN'],
-  [142, 733, 'UA'], [102, 541, 'US'], [51, 266, 'EV'], [187, 1608, 'UA'], [142, 746, 'EV'],
-  [353, 2586, 'VX'], [139, 937, 'B6'], [221, 1400, 'UA'], [59, 282, 'EV'], [253, 1428, 'B6'],
-  [102, 529, 'EV'], [143, 719, 'MQ'], [345, 2565, 'UA'], [161, 888, 'AA'], [195, 1183, 'DL'],
-  [142, 711, 'WN'], [131, 820, 'EV'], [160, 1005, 'B6'], [339, 2133, 'UA'], [108, 488, 'EV'],
-  [108, 502, 'DL'], [156, 1065, 'UA'], [40, 187, 'AA'], [137, 738, 'WN'], [114, 488, 'EV'],
-  [156, 1096, 'AA'], [79, 427, 'MQ'], [45, 199, 'EV'], [298, 1990, 'DL'], [188, 1598, 'DL'],
-  [70, 301, 'B6'], [238, 1416, 'UA'], [173, 1069, 'B6'], [243, 1389, 'AA'], [252, 1605, 'UA'],
-  [132, 762, 'DL'], [264, 1620, 'WN'], [139, 764, 'MQ'], [100, 544, 'US'], [38, 184, 'US'],
-  [346, 2465, 'B6'], [97, 479, 'MQ'], [128, 762, 'FL'], [147, 733, 'AA'], [252, 1372, 'AA'],
-  [170, 1020, 'MQ'], [243, 1372, 'UA'], [40, 187, 'B6'], [158, 1085, 'UA'], [107, 533, 'EV'],
-  [65, 264, 'B6'], [102, 502, 'MQ'], [163, 1089, 'AA'], [239, 1411, 'WN'], [150, 1028, 'B6'],
-  [95, 529, 'US'], [33, 143, 'EV'], [38, 169, 'EV'], [80, 431, 'MQ'], [25, 116, 'EV'],
-  [140, 950, 'B6'], [334, 2454, 'UA'], [295, 1969, 'DL'], [131, 760, 'DL'], [352, 2475, 'VX'],
-  [157, 1065, 'UA'], [149, 645, 'EV'], [134, 828, 'B6'], [69, 319, 'EV'], [352, 2475, 'B6'],
-  [161, 1096, 'AA'], [170, 1047, 'B6'], [362, 2475, 'AA'], [194, 872, 'EV'], [235, 1389, 'AA'],
-  [656, 4963, 'UA'], [334, 2133, 'WN'], [57, 282, 'EV'], [49, 273, 'B6'], [37, 209, 'EV'],
-  [152, 799, 'EV'], [102, 628, 'EV'], [37, 187, 'DL'], [86, 445, 'EV'], [144, 944, 'B6'],
-  [141, 725, 'WN'], [98, 544, 'MQ'], [135, 719, 'UA'], [146, 733, 'UA'], [218, 1400, 'UA'],
-  [318, 2133, 'US'], [178, 963, 'EV'], [130, 762, 'DL'], [183, 946, 'EV'], [133, 762, 'FL'],
-  [154, 1065, 'B6'], [136, 719, 'UA'], [348, 2402, 'UA'], [136, 719, 'MQ'], [38, 187, 'B6'],
-  [349, 2422, 'B6'], [160, 1080, 'DL'], [93, 419, 'MQ'], [362, 2586, 'UA'], [53, 229, 'EV'],
-  [129, 569, 'EV'], [132, 746, 'EV'], [371, 2465, 'B6'], [149, 1023, 'UA'], [227, 1416, 'UA'],
-  [151, 1035, 'B6'], [91, 404, 'UA'], [163, 1020, 'DL'], [375, 2586, 'DL'], [56, 213, 'DL'],
-  [94, 502, 'DL'], [141, 944, 'AA'], [51, 212, 'EV'], [147, 733, 'AA'], [129, 762, 'MQ'],
-  [161, 1089, 'AA'], [96, 544, 'US'], [78, 427, 'MQ'], [57, 228, '9E'], [68, 301, '9E'],
-  [162, 1069, 'B6'], [99, 425, 'MQ'], [51, 214, 'US'], [47, 284, 'EV'], [57, 209, '9E'],
-  [340, 2475, 'DL'], [192, 1182, 'B6'], [87, 340, 'B6'], [152, 1035, 'DL'], [140, 733, 'UA'],
-  [252, 1504, 'UA'], [166, 1068, 'UA'], [97, 529, 'US'], [94, 479, 'MQ'], [96, 463, 'EV'],
-  [152, 997, 'UA'], [167, 1076, 'B6'], [156, 1065, 'UA'], [63, 277, 'EV'], [82, 431, 'MQ'],
-  [248, 1389, 'AA'], [237, 1620, 'UA'], [66, 264, '9E'], [130, 665, 'MQ'], [146, 937, 'UA'],
-  [156, 997, 'B6'], [135, 762, 'DL'], [60, 292, 'DL'], [142, 944, 'B6'], [102, 529, 'EV'],
-  [79, 340, 'MQ'], [171, 1041, 'B6'], [348, 2565, 'UA'], [236, 1372, 'AA'], [57, 213, 'MQ'],
-  [152, 937, 'UA'], [145, 950, 'DL'], [98, 483, 'MQ'], [356, 2475, 'UA'], [337, 2454, 'UA'],
-  [156, 1028, 'B6'], [152, 937, 'B6'], [null, 1147, 'MQ'], [141, 711, 'WN'], [163, 1069, 'AA'],
-  [66, 301, 'B6'], [168, 1074, 'B6'], [210, 1400, 'UA'], [null, 872, 'EV'], [160, 888, 'AA'],
-  [138, 719, 'UA'], [103, 544, 'US'], [40, 184, '9E'], [45, 199, 'EV'], [106, 594, 'EV'],
-  [247, 1605, 'UA'], [120, 605, 'EV'], [133, 738, 'WN'], [133, 944, 'DL'], [360, 2586, 'AA'],
-  [351, 2475, 'AA'], [342, 2227, 'UA'], [193, 1598, 'B6'], [342, 2446, 'DL'], [320, 1990, 'DL'],
-  [88, 419, 'UA'], [146, 740, '9E'], [129, 746, 'DL'], [167, 1020, 'MQ'], [234, 1092, 'EV'],
-  [156, 1085, 'UA'], [139, 665, '9E'], [55, 229, 'EV'], [132, 762, 'FL'], [150, 765, '9E'],
-  [254, 1391, 'AA'], [41, 187, '9E'], [131, 762, 'DL'], [118, 589, 'MQ'], [69, 335, 'EV'],
-  [171, 1074, 'DL'], [143, 733, 'UA'], [168, 748, 'EV'], [53, 228, 'EV'], [166, 1065, 'B6'],
-  [309, 2248, 'DL'], [35, 94, '9E'], [141, 719, 'UA'], [189, 1107, 'DL'], [58, 282, 'EV'],
-  [150, 740, 'B6'], [254, 1605, 'WN'], [79, 431, 'MQ'], [162, 1065, 'UA'], [106, 544, 'MQ'],
-  [146, 733, 'AA'], [58, 209, 'B6'], [35, 200, 'UA'], [249, 1389, 'AA'], [171, 1096, 'AA'],
-  [137, 944, 'B6'], [155, 1069, 'DL'], [168, 1020, 'DL'], [235, 1620, 'DL'], [328, 2133, 'UA'],
-  [73, 319, 'EV'], [136, 762, 'MQ'], [242, 1400, 'UA'], [130, 760, 'DL'], [317, 2153, 'US'],
-  [188, 1598, 'AA'], [370, 2475, 'B6'], [108, 509, 'DL'], [159, 1005, 'B6'], [354, 2586, 'VX'],
-  [53, 212, 'EV'], [248, 1626, 'DL'], [121, 569, 'EV'], [147, 1028, 'B6'], [48, 199, 'EV'],
-  [309, 2133, 'US'], [346, 2425, 'UA'], [181, 888, 'WN'], [139, 719, 'MQ'], [247, 1605, 'UA'],
-  [84, 404, 'UA'], [42, 200, 'B6'], [173, 1029, '9E'], [140, 725, 'EV'], [106, 502, 'MQ'],
-  [41, 187, 'AA'], [161, 1068, 'UA'], [89, 445, 'EV'], [139, 746, 'EV'], [162, 1010, 'B6'],
-  [349, 2446, 'B6'], [252, 1389, 'AA'], [158, 1076, 'DL'], [38, 209, 'EV'], [251, 1521, 'DL'],
-  [36, 143, 'EV'], [280, 1747, 'AA'], [357, 2586, 'DL'], [362, 2475, 'VX'], [322, 2248, 'AA'],
-  [181, 872, 'WN'], [148, 937, 'UA'], [52, 290, 'MQ'], [247, 1521, 'AA'], [144, 733, 'UA'],
-  [234, 1416, 'UA'], [251, 1372, 'AA'], [110, 544, 'US'], [121, 746, 'DL'], [334, 2454, 'UA'],
-  [245, 1411, 'WN'], [48, 266, 'EV'], [112, 541, 'B6'], [149, 1035, 'B6'], [241, 1620, 'UA'],
-  [242, 1569, 'UA'], [156, 1069, 'B6'], [146, 740, 'AA'], [242, 1620, 'F9'], [183, 1598, 'B6'],
-  [143, 719, 'UA'], [141, 733, 'AA'], [189, 1598, 'B6'], [80, 431, 'MQ'], [363, 2475, 'DL'],
-  [104, 529, 'US'], [235, 1400, 'UA'], [157, 1089, 'AA'], [347, 2586, 'UA'], [357, 2446, 'AA'],
-  [135, 642, 'EV'], [360, 2565, 'UA'], [128, 762, 'FL'], [323, 2153, 'B6'], [344, 2402, 'UA'],
-  [119, 533, 'EV'], [176, 1074, 'B6'], [147, 1023, 'B6'], [93, 502, 'DL'], [341, 2454, 'DL'],
-  [167, 1096, 'DL'], [null, 1147, 'MQ'], [145, 950, 'DL'], [72, 427, '9E'], [137, 937, 'B6'],
-  [160, 1005, 'B6'], [160, 1010, 'DL'], [137, 725, 'WN'], [65, 228, 'B6'], [345, 2475, 'UA'],
-  [141, 944, 'B6'], [148, 711, 'WN'], [144, 950, 'B6'], [140, 937, 'UA'], [45, 199, 'EV'],
-  [125, 762, 'DL'], [36, 187, 'B6'], [152, 1069, 'B6'], [135, 719, 'UA'], [95, 463, 'EV'],
-  [78, 427, 'B6'], [83, 404, 'UA'], [61, 292, 'DL'], [340, 2454, 'UA'], [104, 488, 'EV'],
-  [154, 764, 'MQ'], [100, 541, 'US'], [336, 2434, 'UA'], [152, 764, 'MQ'], [null, 2425, 'UA'],
-  [336, 2402, 'AS'], [337, 2465, 'B6'], [228, 1372, 'UA'], [177, 872, 'EV'], [334, 2569, 'B6'],
-  [213, 1134, 'EV'], [46, 185, 'WN'], [93, 479, 'MQ'], [307, 2227, 'UA'], [138, 733, 'AA'],
-  [366, 2454, 'AA'], [158, 1029, 'DL'], [348, 2422, 'AA'], [107, 509, '9E'], [106, 529, 'US'],
-  [153, 1096, 'AA'], [334, 2422, 'DL'], [246, 1605, 'UA'], [80, 419, 'EV'], [152, 1023, 'UA'],
-  [48, 284, 'EV'], [106, 636, '9E'], [342, 2434, 'UA'], [137, 719, 'MQ'], [123, 733, 'UA'],
-  [123, 569, 'EV'], [70, 301, 'B6'], [96, 444, 'MQ'], [357, 2586, 'UA'], [46, 266, 'EV'],
-  [149, 1065, 'UA'], [169, 888, 'AA'], [34, 187, 'DL'], [192, 1598, 'DL'], [223, 1389, 'AA'],
-  [190, 1598, 'AA'], [361, 2586, 'AA'], [134, 762, 'FL'], [55, 228, 'EV'], [207, 1182, '9E'],
-  [364, 2586, 'VX'], [54, 214, 'US'], [87, 419, 'MQ'], [135, 762, 'DL'], [231, 1416, 'UA'],
-  [336, 2475, 'AA'], [133, 944, 'B6'], [132, 760, 'DL'], [131, 738, 'WN'], [55, 277, 'EV'],
-  [150, 1089, 'DL'], [330, 2576, 'B6'], [133, 944, 'DL'], [150, 997, 'UA'], [361, 2586, 'DL'],
-  [159, 1005, 'DL'], [291, 1990, 'B6'], [323, 2248, 'DL'], [159, 748, 'EV'], [141, 740, '9E'],
-  [107, 544, 'US'], [81, 431, 'MQ'], [142, 950, 'DL'], [309, 2133, 'UA'], [281, 1990, 'DL'],
-  [351, 2565, 'UA'], [136, 733, 'AA'], [105, 529, 'EV'], [314, 2153, 'DL'], [116, 605, 'EV'],
-  [333, 2521, 'B6'], [52, 229, 'EV'], [332, 2475, 'DL'], [248, 1372, 'AA'], [75, 427, '9E'],
-  [192, 1585, 'UA'], [333, 2446, 'DL'], [154, 765, 'MQ'], [209, 1134, 'EV'], [332, 2475, 'AA'],
-  [68, 277, 'EV'], [null, 1391, '9E'], [158, 1005, 'AA'], [36, 200, 'UA'], [152, 1076, 'B6'],
-  [60, 213, 'MQ'], [129, 828, '9E'], [106, 628, 'EV'], [309, 2248, 'B6'], [null, 1215, 'EV'],
-  [349, 2475, 'VX'], [342, 2402, 'UA'], [76, 340, '9E'], [41, 184, '9E'], [337, 2586, 'B6'],
-  [233, 1372, 'UA'], [251, 1587, 'DL'], [232, 1400, 'UA'], [138, 631, 'EV'], [30, 94, '9E'],
-  [159, 1096, 'AA'], [154, 1085, 'UA'], [121, 708, 'EV'], [126, 733, 'UA'], [163, 1020, 'MQ'],
-  [91, 479, 'MQ'], [65, 319, 'EV'], [77, 404, 'UA'], [35, 187, 'AA'], [62, 301, '9E'],
-  [null, 1325, 'EV'], [99, 483, 'MQ'], [91, 425, '9E'], [149, 1069, 'B6'], [157, 1068, 'UA'],
-  [73, 397, 'FL'], [255, 1521, 'B6'], [118, 589, '9E'], [328, 2465, 'B6'], [157, 1069, 'DL'],
-  [248, 1504, 'UA'], [130, 725, 'EV'], [150, 1028, 'B6'], [134, 711, 'WN'], [33, 209, 'EV'],
-  [126, 733, 'AA'], [245, 1428, 'B6'], [195, 1182, 'B6'], [223, 1400, 'UA'], [35, 200, 'UA'],
-  [333, 2454, 'UA'], [78, 416, 'EV'], [131, 828, 'B6'], [43, 213, '9E'], [136, 937, 'UA'],
-  [83, 427, 'MQ'], [331, 2454, 'B6'], [163, 1074, 'B6'], [102, 502, 'MQ'], [142, 1023, 'UA'],
-  [31, 143, 'EV'], [51, 212, 'EV'], [140, 950, 'B6'], [77, 431, 'MQ'], [133, 719, 'MQ'],
-  [136, 642, 'EV'], [134, 725, 'WN'], [159, 997, 'UA'], [101, 544, 'MQ'], [34, 187, 'B6'],
-  [199, 1608, 'UA'], [309, 2248, 'DL'], [323, 2475, 'B6'], [354, 2565, 'UA'], [138, 937, 'B6'],
-  [127, 762, 'MQ'], [65, 277, 'EV'], [115, 589, '9E'], [28, 160, 'EV'], [200, 1017, 'EV'],
-  [160, 1076, 'B6'], [143, 937, 'B6'], [153, 764, 'MQ'], [338, 2475, 'AA'], [54, 213, 'MQ'],
-  [223, 1626, 'B6'], [152, 1065, 'UA'], [154, 1065, 'B6'], [189, 1598, 'B6'], [140, 944, 'B6'],
-  [36, 169, 'EV'], [146, 1085, 'AA'], [143, 1028, 'B6'], [86, 427, 'B6'], [64, 301, 'B6'],
-  [191, 1598, 'B6'], [163, 1005, 'B6'], [56, 282, 'EV'], [47, 284, 'EV'], [153, 1069, 'B6'],
-  [44, 273, 'B6'], [37, 187, 'B6'], [24, 116, 'EV'], [59, 264, 'B6'], [59, 266, 'B6'],
-  [57, 301, 'B6'], [44, 199, 'EV'], [44, 266, 'EV'], [290, 2248, 'B6'], [45, 209, 'B6'],
-  [222, 1092, 'EV'], [195, 1617, 'B6'], [185, 1598, 'B6'], [186, 1576, 'B6'], [null, 416, 'EV'],
-  [null, 1389, 'AA'], [null, 1096, 'AA'], [null, 1069, 'B6'], [189, 1598, 'B6'], [49, 209, 'B6'],
-  [108, 529, 'US'], [214, 1400, 'UA'], [156, 1089, 'AA'], [231, 1416, 'UA'], [184, 1576, 'B6'],
-  [156, 1069, 'B6'], [146, 1028, 'B6'], [159, 1076, 'B6'], [255, 1389, 'AA'], [158, 1005, 'B6'],
-  [87, 502, 'DL'], [54, 229, 'EV'], [128, 762, 'DL'], [117, 585, 'DL'], [129, 762, 'FL'],
-  [341, 2586, 'UA'], [289, 2227, 'UA'], [157, 1085, 'UA'], [98, 463, 'EV'], [155, 1008, 'EV'],
-  [120, 569, '9E'], [140, 944, 'B6'], [117, 725, 'WN'], [82, 502, 'MQ'], [125, 733, 'UA'],
-  [28, 96, 'US'], [118, 733, 'AA'], [341, 2454, 'UA'], [329, 2565, 'UA'], [129, 760, 'DL'],
-  [167, 1020, 'DL'], [151, 1085, 'AA'], [158, 1065, 'B6'], [172, 963, 'EV'], [124, 746, 'DL'],
-  [139, 711, 'WN'], [146, 1023, 'B6'], [191, 1598, 'B6'], [354, 2475, 'UA'], [106, 541, 'US'],
-  [155, 1096, 'AA'], [159, 1020, 'MQ'], [138, 762, 'MQ'], [106, 544, 'MQ'], [230, 1416, 'UA'],
-  [249, 1372, 'UA'], [103, 529, 'US'], [159, 1010, 'DL'], [42, 169, 'WN'], [51, 212, 'EV'],
-  [118, 569, 'EV'], [308, 2133, 'US'], [177, 1074, 'B6'], [166, 1076, 'DL'], [42, 185, 'WN'],
-  [82, 416, 'EV'], [325, 2454, 'UA'], [123, 733, 'AA'], [248, 1504, 'UA'], [299, 2133, 'UA'],
-  [138, 748, 'EV'], [312, 2153, 'US'], [79, 404, 'UA'], [34, 187, 'B6'], [145, 1023, 'UA'],
-  [138, 746, 'EV'], [249, 1389, 'AA'], [60, 301, 'B6'], [142, 950, 'B6'], [109, 544, 'US'],
-  [218, 1620, 'UA'], [34, 200, 'UA'], [102, 529, 'US'], [274, 1990, 'DL'], [141, 937, 'UA'],
-  [323, 2586, 'DL'], [168, 1065, 'UA'], [144, 944, 'AA'], [297, 2248, 'B6'], [317, 2475, 'DL'],
-  [162, 1035, 'DL'], [161, 1096, 'DL'], [162, 1069, 'B6'], [233, 1147, 'MQ'], [46, 214, 'US'],
-  [330, 2475, 'VX'], [102, 529, 'EV'], [122, 733, 'AA'], [163, 1096, 'AA'], [193, 1183, 'DL'],
-  [164, 997, 'UA'], [192, 1182, 'B6'], [90, 502, 'DL'], [194, 1608, 'UA'], [197, 1598, 'AA'],
-  [115, 719, 'MQ'], [160, 1089, 'AA'], [327, 2475, 'B6'], [125, 762, 'DL'], [127, 733, 'UA'],
-  [161, 1069, 'AA'], [144, 944, 'B6'], [341, 2586, 'UA'], [168, 1068, 'UA'], [112, 719, 'MQ'],
-  [314, 2402, 'AS'], [114, 719, 'UA'], [344, 2586, 'VX'], [338, 2434, 'UA'], [251, 1605, 'UA'],
-  [113, 738, 'FL'], [168, 1080, 'B6'], [309, 2422, 'DL'], [187, 1598, 'B6'], [351, 2475, 'AA'],
-  [50, 209, 'B6'], [230, 1416, 'UA'], [57, 264, 'B6'], [335, 2586, 'B6'], [235, 1411, 'WN'],
-  [34, 200, 'UA'], [162, 1010, 'B6'], [121, 733, 'AA'], [353, 2586, 'AA'], [144, 937, 'UA'],
-  [263, 1620, 'WN'], [94, 445, 'EV'], [220, 1620, 'UA'], [30, 94, '9E'], [128, 746, 'DL'],
-  [244, 1389, 'AA'], [350, 2565, 'UA'], [167, 1041, 'B6'], [151, 1023, 'UA'], [68, 340, '9E'],
-  [109, 594, 'EV'], [49, 266, 'EV'], [215, 1400, 'UA'], [46, 199, 'EV'], [143, 950, 'DL'],
-  [146, 937, 'B6'], [155, 1069, 'B6'], [123, 762, 'DL'], [155, 1089, 'DL'], [106, 544, 'US'],
-  [160, 1096, 'AA'], [38, 200, 'B6'], [143, 944, 'DL'], [241, 1372, 'AA'], [86, 427, 'MQ'],
-  [310, 2434, 'UA'], [193, 1623, 'AA'], [170, 1069, 'DL'], [124, 760, 'DL'], [107, 529, 'US'],
-  [71, 340, 'B6'], [142, 1020, 'DL'], [253, 1620, 'DL'], [160, 1005, 'DL'], [131, 764, 'MQ'],
-  [153, 1035, 'DL'], [90, 479, 'MQ'], [43, 213, 'MQ'], [132, 645, 'EV'], [143, 740, '9E'],
-  [37, 187, 'AA'], [108, 541, 'B6'], [330, 2446, 'B6'], [336, 2248, 'DL'], [136, 828, 'B6'],
-  [187, 1598, 'B6'], [259, 1372, 'UA'], [343, 2454, 'UA'], [127, 762, 'FL'], [118, 733, 'AA'],
-  [169, 1080, 'DL'], [146, 888, 'AA'], [163, 1008, 'DL'], [198, 1134, 'EV'], [239, 1620, 'F9'],
-  [188, 1598, 'DL'], [124, 762, 'MQ'], [61, 284, 'EV'], [42, 213, '9E'], [138, 740, 'B6'],
-  [47, 246, 'EV'], [229, 1389, 'AA'], [340, 2475, 'UA'], [129, 719, 'UA'], [106, 533, 'EV'],
-  [331, 2133, 'WN'], [180, 1008, 'EV'], [87, 427, '9E'], [200, 1598, 'AA'], [83, 431, 'MQ'],
-  [349, 2586, 'UA'], [40, 195, 'EV'], [59, 301, '9E'], [71, 419, 'MQ'], [93, 509, '9E'],
-  [160, 1005, 'B6'], [242, 1605, 'UA'], [108, 628, 'EV'], [153, 1029, '9E'], [171, 1068, 'B6'],
-  [346, 2425, 'UA'], [178, 946, 'EV'], [312, 2402, 'UA'], [336, 2475, 'AA'], [126, 711, 'WN'],
-  [88, 488, 'DL'], [310, 2475, 'DL'], [80, 502, 'MQ'], [163, 1089, 'AA'], [125, 746, 'DL'],
-  [128, 762, 'DL'], [162, 1096, 'DL'], [350, 2565, 'UA'], [59, 277, 'EV'], [330, 2454, 'UA'],
-  [79, 404, 'UA'], [230, 1416, 'UA'], [148, 950, 'DL'], [258, 1874, 'UA'], [107, 719, 'UA'],
-  [338, 2475, 'VX'], [51, 266, 'B6'], [null, 1131, 'EV'], [160, 1069, 'B6'], [638, 4983, 'HA'],
-  [100, 544, 'US'], [92, 502, 'DL'], [50, 228, 'B6'], [227, 1400, 'UA'], [94, 544, 'MQ'],
-  [195, 1634, 'UA'], [39, 187, 'B6'], [109, 605, 'EV'], [237, 1389, 'AA'], [243, 1372, 'AA'],
-  [61, 319, 'EV'], [209, 1608, 'B6'], [88, 427, 'B6'], [162, 1076, 'B6'], [308, 2248, 'VX'],
-  [137, 820, 'EV'], [251, 1521, 'B6'], [159, 997, 'UA'], [103, 541, 'US'], [164, 1047, 'DL'],
-  [261, 1726, 'UA'], [154, 1023, 'UA'], [243, 1605, 'WN'], [156, 1010, 'DL'], [161, 1065, 'UA'],
-  [61, 301, 'B6'], [123, 738, 'WN'], [49, 284, 'EV'], [156, 1028, 'B6'], [155, 1035, 'B6'],
-  [41, 209, 'EV'], [45, 199, 'EV'], [119, 733, 'AA'], [121, 762, 'MQ'], [82, 416, 'EV'],
-  [47, 273, 'B6'], [59, 264, '9E'], [49, 229, 'EV'], [121, 725, 'WN'], [362, 2586, 'DL'],
-  [174, 872, 'EV'], [147, 937, 'UA'], [159, 1076, 'DL'], [175, 1065, 'B6'], [292, 2133, 'US'],
-  [131, 708, 'EV'], [39, 184, '9E'], [326, 2475, 'B6'], [243, 1605, 'UA'], [103, 544, 'US'],
-  [111, 541, 'US'], [112, 719, 'MQ'], [104, 529, 'US'], [310, 2248, 'DL'], [122, 762, 'FL'],
-  [303, 2153, 'US'], [126, 762, 'DL'], [225, 1389, 'AA'], [117, 628, 'EV'], [35, 187, 'B6'],
-  [157, 1020, 'DL'], [90, 431, 'MQ'], [219, 1416, 'UA'], [126, 746, 'DL'], [357, 2586, 'VX'],
-  [51, 282, 'EV'], [40, 200, 'UA'], [100, 583, 'EV'], [146, 944, 'B6'], [181, 1065, 'UA'],
-  [128, 645, 'EV'], [344, 2475, 'AA'], [103, 502, 'MQ'], [148, 1023, 'B6'], [168, 963, 'DL'],
-  [111, 719, 'UA'], [158, 1076, 'B6'], [134, 764, 'MQ'], [275, 1990, 'DL'], [310, 2565, 'UA'],
-  [172, 1068, 'UA'], [228, 1389, 'AA'], [143, 950, 'DL'], [34, 184, 'US'], [144, 944, 'B6'],
-  [125, 762, 'DL'], [54, 213, 'MQ'], [314, 2227, 'UA'], [47, 214, 'US'], [187, 1023, 'UA'],
-  [330, 2586, 'B6'], [226, 1400, 'UA'], [340, 2586, 'UA'], [35, 185, 'WN'], [168, 1096, 'AA'],
-  [53, 266, 'B6'], [92, 502, 'DL'], [89, 479, 'MQ'], [116, 733, 'AA'], [167, 1096, 'DL'],
-  [60, 335, 'EV'], [144, 944, 'DL'], [270, 1620, 'UA'], [133, 733, 'AA'], [104, 544, 'US'],
-  [86, 488, 'EV'], [null, 618, '9E'], [332, 2475, 'UA'], [169, 1080, 'DL'], [162, 888, 'WN'],
-  [168, 1074, 'B6'], [153, 997, 'UA'], [194, 1608, 'UA'], [341, 2475, 'VX'], [175, 1069, 'B6'],
-  [148, 1035, 'DL'], [154, 1085, 'AA'], [128, 746, 'DL'], [334, 2434, 'UA'], [158, 1020, 'DL'],
-  [157, 1020, 'MQ'], [66, 397, 'FL'], [153, 1010, 'DL'], [55, 213, 'MQ'], [243, 1389, 'AA'],
-  [140, 937, 'B6'], [241, 1428, 'B6'], [348, 2475, 'DL'], [125, 762, 'MQ'], [36, 200, 'UA'],
-  [35, 200, 'B6'], [196, 1183, 'DL'], [81, 416, 'EV'], [161, 1076, 'DL'], [110, 541, 'US'],
-  [176, 872, 'WN'], [232, 1400, 'UA'], [338, 2586, 'VX'], [75, 419, 'MQ'], [341, 2475, 'AA'],
-  [50, 284, 'EV'], [86, 431, 'MQ'], [49, 282, 'EV'], [148, 937, 'UA'], [134, 746, 'EV'],
-  [246, 1605, 'UA'], [172, 888, 'AA'], [337, 2475, 'B6'], [118, 719, 'MQ'], [161, 1005, 'B6'],
-  [316, 2565, 'UA'], [48, 266, 'EV'], [131, 725, 'EV'], [106, 533, 'EV'], [131, 820, 'EV'],
-  [90, 488, 'EV'], [85, 427, 'MQ'], [63, 301, 'B6'], [320, 2133, 'UA'], [101, 502, 'DL'],
-  [127, 738, 'WN'], [139, 764, 'MQ'], [95, 463, 'EV'], [36, 169, 'WN'], [158, 1096, 'AA'],
-  [233, 1372, 'AA'], [264, 1990, 'DL'], [108, 488, 'EV'], [94, 550, 'EV'], [188, 1598, 'DL'],
-  [226, 1389, 'AA'], [333, 2465, 'B6'], [36, 187, 'AA'], [225, 1416, 'UA'], [111, 569, '9E'],
-  [126, 762, 'DL'], [104, 544, 'US'], [166, 1069, 'B6'], [110, 585, 'DL'], [114, 711, 'WN'],
-  [46, 199, 'EV'], [126, 746, 'DL'], [231, 1372, 'UA'], [258, 1620, 'WN'], [84, 479, 'MQ'],
-  [159, 1085, 'UA'], [136, 719, 'UA'], [157, 1028, 'B6'], [40, 187, 'B6'], [135, 733, 'AA'],
-  [122, 762, 'FL'], [109, 529, 'US'], [88, 445, 'EV'], [144, 950, 'B6'], [340, 2454, 'UA'],
-  [240, 1411, 'WN'], [89, 431, 'MQ'], [164, 1065, 'B6'], [130, 760, 'DL'], [361, 2475, 'VX'],
-  [54, 282, 'EV'], [339, 2465, 'B6'], [48, 246, 'EV'], [193, 1598, 'B6'], [203, 1092, 'EV'],
-  [33, 143, 'EV'], [62, 264, 'B6'], [24, 116, 'EV'], [148, 937, 'B6'], [200, 1134, 'EV'],
-  [133, 828, 'B6'], [167, 1047, 'B6'], [172, 1065, 'UA'], [105, 529, 'EV'], [174, 872, 'EV'],
-  [344, 2475, 'AA'], [126, 762, 'DL'], [158, 1096, 'AA'], [150, 950, 'DL'], [634, 4963, 'UA'],
-  [159, 1089, 'AA'], [103, 544, 'MQ'], [299, 2133, 'US'], [123, 725, 'WN'], [61, 277, 'EV'],
-  [323, 2422, 'B6'], [163, 944, 'B6'], [208, 1400, 'UA'], [57, 228, 'EV'], [45, 273, 'B6'],
-  [83, 502, 'MQ'], [111, 628, 'EV'], [36, 187, 'DL'], [124, 762, 'FL'], [160, 1096, 'DL'],
-  [111, 719, 'MQ'], [150, 937, 'UA'], [341, 2586, 'UA'], [165, 1020, 'MQ'], [37, 169, 'EV'],
-  [145, 799, 'EV'], [135, 719, 'UA'], [150, 1023, 'UA'], [122, 762, 'DL'], [154, 1076, 'DL'],
-  [52, 229, 'EV'], [347, 2586, 'DL'], [330, 2133, 'WN'], [237, 1416, 'UA'], [87, 404, 'UA'],
-  [167, 1041, 'B6'], [179, 946, 'EV'], [148, 1035, 'B6'], [178, 1080, 'DL'], [159, 1020, 'DL'],
-  [60, 213, 'DL'], [94, 544, 'US'], [61, 301, 'B6'], [59, 301, '9E'], [81, 425, 'MQ'],
-  [93, 541, '9E'], [157, 1028, 'B6'], [91, 502, 'DL'], [158, 1065, 'UA'], [196, 1182, 'B6'],
-  [168, 1076, 'B6'], [160, 997, 'UA'], [200, 1107, 'DL'], [177, 872, 'EV'], [161, 1096, 'AA'],
-  [36, 187, 'B6'], [155, 1035, 'DL'], [53, 214, 'US'], [71, 340, 'B6'], [143, 937, 'UA'],
-  [57, 290, '9E'], [124, 733, 'AA'], [126, 762, 'MQ'], [91, 529, 'US'], [126, 762, 'DL'],
-  [82, 479, 'MQ'], [341, 2475, 'DL'], [324, 2402, 'UA'], [41, 184, 'US'], [223, 1372, 'AA'],
-  [44, 200, 'UA'], [163, 1089, 'AA'], [160, 1005, 'B6'], [116, 665, 'MQ'], [56, 228, '9E'],
-  [161, 997, 'B6'], [239, 1504, 'UA'], [51, 266, 'EV'], [109, 594, 'EV'], [129, 719, 'UA'],
-  [123, 738, 'WN'], [148, 888, 'AA'], [230, 1389, 'AA'], [70, 419, 'MQ'], [346, 2454, 'UA'],
-  [205, 1400, 'UA'], [243, 1605, 'UA'], [41, 184, '9E'], [236, 1620, 'DL'], [58, 292, '9E'],
-  [59, 213, 'MQ'], [341, 2475, 'UA'], [150, 944, 'B6'], [94, 544, 'US'], [49, 209, '9E'],
-  [91, 544, 'MQ'], [85, 427, 'MQ'], [121, 569, 'EV'], [159, 1069, 'AA'], [71, 340, 'MQ'],
-  [299, 2227, 'UA'], [354, 2586, 'AA'], [170, 1069, 'B6'], [156, 1010, 'DL'], [216, 1147, 'MQ'],
-  [80, 431, 'MQ'], [150, 937, 'UA'], [54, 264, '9E'], [94, 483, 'MQ'], [150, 944, 'DL'],
-  [195, 1598, 'B6'], [152, 950, 'DL'], [150, 740, '9E'], [229, 1389, 'AA'], [129, 746, 'DL'],
-  [167, 1029, '9E'], [79, 419, 'UA'], [166, 1068, 'UA'], [63, 319, 'EV'], [169, 1074, 'B6'],
-  [151, 740, 'B6'], [331, 2446, 'DL'], [277, 1990, 'DL'], [119, 760, 'DL'], [47, 254, 'EV'],
-  [305, 2454, 'DL'], [155, 1096, 'AA'], [211, 1092, 'EV'], [153, 1035, 'B6'], [174, 1074, 'DL'],
-  [168, 1065, 'UA'], [230, 1391, 'AA'], [170, 1065, 'B6'], [161, 1085, 'UA'], [130, 762, 'FL'],
-  [118, 589, 'MQ'], [125, 733, 'UA'], [92, 463, 'EV'], [139, 765, '9E'], [38, 200, 'UA'],
-  [46, 187, '9E'], [109, 605, 'EV'], [320, 2248, 'DL'], [168, 963, 'DL'], [154, 725, 'EV'],
-  [76, 431, 'MQ'], [48, 209, 'B6'], [165, 1069, 'DL'], [126, 762, 'DL'], [340, 2133, 'UA'],
-  [29, 94, '9E'], [346, 2586, 'AA'], [41, 199, 'EV'], [190, 1598, 'AA'], [151, 944, 'B6'],
-  [56, 229, 'EV'], [83, 427, '9E'], [157, 1010, 'B6'], [136, 764, 'MQ'], [116, 665, '9E'],
-  [246, 1605, 'WN'], [129, 733, 'AA'], [333, 2565, 'UA'], [220, 1400, 'UA'], [166, 964, '9E'],
-  [97, 502, 'DL'], [166, 1068, 'UA'], [57, 212, 'EV'], [323, 2422, 'DL'], [321, 2475, 'B6'],
-  [96, 509, 'DL'], [75, 404, 'UA'], [156, 1020, 'DL'], [346, 2586, 'VX'], [242, 1626, 'DL'],
-  [319, 2425, 'UA'], [152, 888, 'WN'], [303, 2133, 'US'], [121, 642, 'EV'], [172, 1074, 'B6'],
-  [157, 1089, 'DL'], [240, 1389, 'AA'], [58, 284, 'EV'], [115, 719, 'MQ'], [142, 937, 'UA'],
-  [244, 1605, 'UA'], [45, 187, 'AA'], [91, 541, 'B6'], [260, 1569, 'UA'], [38, 200, 'B6'],
-  [343, 2586, 'DL'], [108, 585, 'DL'], [330, 2475, 'VX'], [243, 1521, 'DL'], [111, 589, '9E'],
-  [159, 872, 'WN'], [331, 2248, 'AA'], [149, 1028, 'B6'], [88, 502, 'MQ'], [334, 2446, 'B6'],
-  [138, 733, 'UA'], [122, 708, 'EV'], [260, 1747, 'AA'], [100, 544, 'US'], [233, 1372, 'AA'],
-  [238, 1416, 'UA'], [148, 748, 'EV'], [233, 1620, 'UA'], [332, 2454, 'UA'], [125, 746, 'EV'],
-  [127, 711, 'WN'], [155, 1005, 'B6'], [55, 290, 'MQ'], [252, 1521, 'AA'], [335, 2475, 'AA'],
-  [125, 740, 'AA'], [134, 765, 'MQ'], [130, 762, 'FL'], [159, 1076, 'DL'], [129, 762, 'DL'],
-  [277, 1969, 'DL'], [381, 2475, 'DL'], [156, 1089, 'AA'], [351, 2434, 'UA'], [91, 529, 'US'],
-  [39, 199, 'EV'], [48, 212, 'EV'], [238, 1620, 'F9'], [248, 1372, 'UA'], [128, 762, 'DL'],
-  [226, 1400, 'UA'], [328, 2586, 'UA'], [52, 266, 'B6'], [127, 762, 'MQ'], [344, 2446, 'AA'],
-  [341, 2425, 'UA'], [113, 569, 'EV'], [127, 733, 'AA'], [322, 2454, 'DL'], [319, 2446, 'DL'],
-  [102, 488, 'EV'], [216, 1147, 'MQ'], [143, 937, 'UA'], [245, 1389, 'AA'], [153, 944, 'B6'],
-  [78, 502, 'DL'], [157, 950, 'DL'], [31, 143, 'EV'], [325, 2475, 'UA'], [85, 431, 'MQ'],
-  [134, 719, 'UA'], [49, 266, 'EV'], [43, 187, 'B6'], [52, 228, 'B6'], [124, 711, 'WN'],
-  [121, 725, 'WN'], [149, 944, 'AA'], [159, 1069, 'B6'], [83, 445, 'EV'], [51, 282, 'EV'],
-  [348, 2586, 'AA'], [161, 1085, 'AA'], [160, 1069, 'B6'], [39, 209, 'EV'], [81, 427, 'B6'],
-  [127, 762, 'DL'], [64, 340, '9E'], [312, 2153, 'US'], [144, 1020, 'DL'], [67, 404, 'UA'],
-  [137, 746, 'EV'], [134, 764, 'MQ'], [81, 479, 'MQ'], [78, 416, 'EV'], [341, 2454, 'UA'],
-  [150, 1023, 'B6'], [129, 733, 'UA'], [53, 277, 'EV'], [164, 1096, 'AA'], [299, 2153, 'B6'],
-  [243, 1411, 'WN'], [40, 185, 'WN'], [317, 2465, 'B6'], [355, 2565, 'UA'], [332, 2402, 'AS'],
-  [44, 199, 'EV'], [74, 419, 'MQ'], [104, 636, '9E'], [325, 2422, 'DL'], [137, 719, 'UA'],
-  [99, 529, 'US'], [151, 1029, 'DL'], [95, 509, 'DL'], [350, 2434, 'UA'], [35, 169, 'EV'],
-  [294, 2227, 'UA'], [122, 746, 'DL'], [323, 2569, 'B6'], [238, 1605, 'UA'], [36, 184, 'MQ'],
-  [158, 950, 'B6'], [57, 335, 'DL'], [161, 1065, 'UA'], [95, 541, 'US'], [321, 2465, 'B6'],
-  [192, 1598, 'DL'], [337, 2422, 'AA'], [36, 169, 'WN'], [328, 2576, 'B6'], [38, 187, 'DL'],
-  [322, 2402, 'UA'], [163, 1020, 'MQ'], [339, 2586, 'UA'], [131, 569, '9E'], [176, 872, 'EV'],
-  [null, 1391, '9E'], [349, 2454, 'AA'], [null, 1092, 'EV'], [155, 888, 'AA'], [353, 2586, 'VX'],
-  [123, 719, 'MQ'], [129, 762, 'FL'], [191, 1598, 'AA'], [125, 762, 'DL'], [48, 214, 'US'],
-  [53, 228, 'EV'], [127, 760, 'DL'], [371, 2475, 'DL'], [130, 738, 'WN'], [154, 944, 'B6'],
-  [191, 1598, 'B6'], [93, 544, 'US'], [58, 301, 'B6'], [50, 292, 'DL'], [151, 944, 'DL'],
-  [151, 1023, 'UA'], [230, 1372, 'AA'], [336, 2248, 'DL'], [143, 748, 'EV'], [333, 2475, 'AA'],
-  [123, 733, 'AA'], [238, 1620, 'DL'], [344, 2565, 'UA'], [102, 533, 'EV'], [157, 1005, 'DL'],
-  [328, 2521, 'B6'], [272, 1990, 'B6'], [230, 1416, 'UA'], [143, 740, '9E'], [311, 2133, 'UA'],
-  [197, 1183, 'DL'], [312, 2153, 'DL'], [80, 431, 'MQ'], [180, 1017, 'EV'], [81, 444, 'MQ'],
-  [153, 950, 'DL'], [158, 1089, 'DL'], [47, 229, 'EV'], [221, 1389, 'AA'], [155, 1010, 'DL'],
-  [149, 1028, 'B6'], [null, 1587, '9E'], [256, 1990, 'DL'], [154, 1035, 'DL'], [150, 937, 'B6'],
-  [80, 483, 'MQ'], [178, 1080, 'DL'], [97, 529, 'EV'], [341, 2586, 'DL'], [39, 200, 'UA'],
-  [160, 1005, 'AA'], [208, 1134, 'EV'], [54, 277, 'EV'], [91, 425, '9E'], [321, 2402, 'UA'],
-  [158, 997, 'UA'], [48, 284, 'EV'], [116, 589, '9E'], [128, 828, '9E'], [93, 541, '9E'],
-  [165, 1076, 'B6'], [209, 1400, 'UA'], [300, 2248, 'B6'], [121, 647, '9E'], [130, 733, 'AA'],
-  [82, 427, '9E'], [125, 762, 'DL'], [335, 2475, 'VX'], [81, 502, 'DL'], [250, 1215, 'EV'],
-  [320, 2586, 'B6'], [137, 733, 'UA'], [30, 94, '9E'], [155, 1096, 'AA'], [164, 1085, 'UA'],
-  [49, 213, 'MQ'], [152, 1076, 'DL'], [48, 199, 'EV'], [122, 711, 'WN'], [124, 762, 'MQ'],
-  [74, 404, 'UA'], [42, 187, 'AA'], [69, 397, 'FL'], [325, 2454, 'B6'], [198, 1182, 'B6'],
-  [83, 479, 'MQ'], [221, 1372, 'UA'], [70, 340, '9E'], [160, 1069, 'B6'], [127, 760, 'DL'],
-  [131, 725, 'EV'], [158, 1069, 'DL'], [259, 1521, 'B6'], [252, 1504, 'UA'], [244, 1428, 'B6'],
-  [202, 1182, '9E'], [85, 427, 'MQ'], [151, 937, 'UA'], [42, 213, '9E'], [345, 2454, 'UA'],
-  [38, 209, 'EV'], [190, 1585, 'UA'], [53, 282, 'EV'], [126, 733, 'AA'], [139, 828, 'B6'],
-  [null, 1074, 'B6'], [103, 463, 'EV'], [143, 866, 'EV'], [116, 631, 'EV'], [316, 2475, 'B6'],
-  [85, 502, 'MQ'], [128, 719, 'MQ'], [78, 416, 'EV'], [105, 628, 'EV'], [316, 2565, 'UA'],
-  [146, 937, 'B6'], [148, 950, 'B6'], [131, 725, 'WN'], [149, 1023, 'UA'], [367, 2475, 'DL'],
-  [92, 544, 'MQ'], [79, 431, 'MQ'], [223, 1400, 'UA'], [156, 1065, 'UA'], [162, 997, 'UA'],
-  [47, 212, 'EV'], [41, 200, 'UA'], [304, 2248, 'DL'], [132, 642, 'EV'], [113, 605, 'EV'],
-  [146, 937, 'B6'], [135, 764, 'MQ'], [63, 301, '9E'], [240, 1626, 'B6'], [50, 277, 'EV'],
-  [190, 1608, 'UA'], [29, 160, 'EV'], [162, 1005, 'B6'], [158, 1076, 'B6'], [307, 2248, 'B6'],
-  [228, 1620, 'UA'], [340, 2475, 'AA'], [194, 1598, 'B6'], [63, 301, 'B6'], [151, 1028, 'B6'],
-  [153, 1065, 'B6'], [159, 1096, 'DL'], [null, 1068, 'UA'], [30, 143, 'EV'], [39, 184, '9E'],
-  [83, 427, 'B6'], [159, 1069, 'B6'], [46, 269, 'DL'], [286, 1325, 'EV'], [191, 1598, 'B6'],
-  [45, 273, 'B6'], [53, 264, 'B6'], [47, 284, 'EV'], [25, 116, 'EV'], [124, 762, 'DL'],
-  [59, 301, 'B6'], [37, 169, 'EV'], [50, 213, 'MQ'], [47, 266, 'EV'], [140, 944, 'B6'],
-  [55, 266, 'B6'], [195, 1617, 'B6'], [180, 1576, 'B6'], [null, 569, 'EV'], [null, 319, 'EV'],
-  [null, 209, 'EV'], [null, 746, 'EV'], [null, 645, 'EV'], [null, 2475, 'AA'], [null, 1389, 'AA'],
-  [null, 719, 'UA'], [193, 1598, 'B6'], [58, 301, 'B6'], [186, 1576, 'B6'], [94, 529, 'US'],
-  [238, 1400, 'UA'], [241, 1416, 'UA'], [158, 1089, 'AA'], [191, 1576, 'B6'], [152, 944, 'B6'],
-  [99, 502, 'DL'], [57, 228, 'EV'], [164, 1069, 'B6'], [128, 762, 'MQ'], [128, 719, 'MQ'],
-  [56, 212, 'EV'], [153, 1023, 'B6'], [163, 1076, 'B6'], [128, 762, 'DL'], [100, 502, 'MQ'],
-  [31, 96, 'US'], [124, 725, 'EV'], [149, 1028, 'B6'], [172, 1005, 'B6'], [99, 488, 'DL'],
-  [52, 229, 'EV'], [135, 762, 'FL'], [132, 733, 'AA'], [64, 404, 'UA'], [129, 725, 'WN'],
-  [39, 169, 'WN'], [324, 2586, 'UA'], [159, 1085, 'AA'], [167, 1096, 'AA'], [188, 1074, 'B6'],
-  [144, 1008, 'EV'], [135, 746, 'DL'], [135, 760, 'DL'], [83, 431, 'MQ'], [98, 541, 'US'],
-  [149, 1020, 'DL'], [335, 2475, 'UA'], [190, 1598, 'B6'], [202, 1598, 'AA'], [162, 1023, 'UA'],
-  [242, 1389, 'AA'], [160, 1065, 'B6'], [206, 1183, 'DL'], [99, 529, 'US'], [292, 2133, 'UA'],
-  [292, 2153, 'US'], [98, 529, 'EV'], [174, 1085, 'UA'], [103, 544, 'US'], [85, 416, 'EV'],
-  [35, 200, 'UA'], [98, 544, 'MQ'], [68, 319, 'EV'], [333, 2133, 'US'], [43, 185, 'WN'],
-  [264, 1504, 'UA'], [248, 1389, 'AA'], [331, 2565, 'UA'], [129, 645, 'EV'], [229, 1416, 'UA'],
-  [154, 748, 'EV'], [37, 187, 'B6'], [56, 292, 'EV'], [138, 642, 'EV'], [60, 301, 'B6'],
-  [97, 529, 'US'], [154, 950, 'B6'], [217, 1620, 'UA'], [272, 1990, 'DL'], [339, 2586, 'DL'],
-  [158, 950, 'DL'], [284, 2227, 'UA'], [129, 762, 'DL'], [168, 1096, 'DL'], [46, 214, 'US'],
-  [319, 2475, 'DL'], [212, 1167, 'EV'], [158, 944, 'AA'], [165, 1069, 'B6'], [294, 2248, 'B6'],
-  [164, 1076, 'DL'], [316, 2475, 'VX'], [126, 719, 'UA'], [95, 488, 'EV'], [313, 2475, 'B6'],
-  [326, 2434, 'UA'], [219, 1605, 'UA'], [213, 1147, 'MQ'], [204, 1182, 'B6'], [167, 1065, 'UA'],
-  [246, 1411, 'WN'], [307, 2454, 'UA'], [158, 937, 'UA'], [190, 1598, 'B6'], [134, 733, 'UA'],
-  [169, 1089, 'AA'], [171, 1069, 'AA'], [123, 738, 'FL'], [122, 569, 'EV'], [166, 1068, 'UA'],
-  [92, 502, 'DL'], [336, 2586, 'UA'], [156, 944, 'B6'], [134, 719, 'MQ'], [147, 1023, 'UA'],
-  [325, 2402, 'AS'], [184, 1080, 'B6'], [226, 1372, 'AA'], [333, 2586, 'VX'], [59, 264, 'B6'],
-  [132, 746, 'DL'], [313, 2475, 'AA'], [230, 1400, 'UA'], [49, 209, 'B6'], [332, 2422, 'DL'],
-  [246, 1416, 'UA'], [133, 746, 'EV'], [158, 997, 'UA'], [336, 2586, 'AA'], [327, 2586, 'B6'],
-  [173, 1010, 'B6'], [129, 719, 'UA'], [95, 340, '9E'], [113, 569, '9E'], [149, 1020, 'DL'],
-  [127, 762, 'DL'], [159, 1008, 'EV'], [158, 937, 'B6'], [194, 1608, 'UA'], [163, 1089, 'DL'],
-  [233, 1620, 'WN'], [337, 2586, 'UA'], [223, 1372, 'UA'], [164, 1029, '9E'], [165, 1069, 'B6'],
-  [172, 1069, 'DL'], [326, 2133, 'WN'], [103, 544, 'US'], [192, 1134, 'EV'], [79, 427, 'MQ'],
-  [219, 1620, 'UA'], [179, 1041, 'B6'], [134, 762, 'FL'], [36, 200, 'B6'], [34, 187, 'AA'],
-  [211, 1623, 'AA'], [157, 944, 'DL'], [175, 1005, 'DL'], [77, 340, 'B6'], [183, 1010, 'DL'],
-  [134, 760, 'DL'], [293, 2248, 'DL'], [96, 479, 'MQ'], [99, 529, 'US'], [123, 740, '9E'],
-  [222, 1620, 'DL'], [37, 209, 'EV'], [149, 764, 'MQ'], [57, 213, 'MQ'], [102, 541, 'US'],
-  [187, 946, 'EV'], [91, 427, '9E'], [91, 445, 'EV'], [321, 2475, 'UA'], [133, 740, 'B6'],
-  [168, 1035, 'DL'], [189, 1065, 'UA'], [196, 1598, 'DL'], [158, 937, 'UA'], [151, 820, 'EV'],
-  [116, 605, 'EV'], [100, 550, 'EV'], [129, 762, 'MQ'], [83, 416, 'EV'], [219, 1620, 'F9'],
-  [118, 711, 'WN'], [61, 277, 'EV'], [43, 213, '9E'], [33, 187, '9E'], [140, 828, 'B6'],
-  [316, 2446, 'B6'], [324, 2565, 'UA'], [39, 200, 'UA'], [168, 1068, 'B6'], [81, 419, 'MQ'],
-  [195, 1598, 'B6'], [306, 2425, 'UA'], [165, 1005, 'B6'], [196, 1131, 'EV'], [107, 488, 'EV'],
-  [126, 645, 'EV'], [50, 284, 'EV'], [167, 1096, 'AA'], [94, 488, 'DL'], [97, 509, '9E'],
-  [131, 762, 'DL'], [99, 544, 'US'], [133, 733, 'AA'], [190, 1092, 'EV'], [323, 2475, 'AA'],
-  [327, 2475, 'DL'], [108, 569, 'EV'], [106, 533, 'EV'], [130, 746, 'DL'], [157, 950, 'DL'],
-  [105, 502, 'MQ'], [322, 2475, 'VX'], [219, 1605, 'UA'], [41, 184, '9E'], [160, 1089, 'AA'],
-  [238, 1400, 'UA']]
-};
-
-// Call Code to Build the system ///////////////////////////////////////////////////////////////////
-
-var v  = new BrunelVis('visualization');
-v.build(table1);
+			+ '<span class="field">' + data.carrier_f(d) + '</span>'
+
+            }
+
+          };
+
+          BrunelD3.addTooltip(selection, tooltipLabeling, geom);
+
+        }
+
+        // Create selections, set the initial state and transition updates
+
+        selection = main.selectAll('.element').data(data._rows, function(d) { return d.key });
+
+        var added = selection.enter().append('use');
+
+        merged = selection.merge(added);
+
+        initialState(added);
+
+        selection.filter(BrunelD3.hasData)
+
+          .classed('selected', BrunelD3.isSelected(data))
+
+          .filter(BrunelD3.isSelected(data)).raise();
+
+        updateState(BrunelD3.transition(merged, transitionMillis));
+
+        label(merged, transitionMillis);
+
+
+
+        BrunelD3.transition(selection.exit(), transitionMillis/3)
+
+          .style('opacity', 0.5).each( function() {
+
+            this.remove(); BrunelD3.removeLabels(this); 
+
+        });
+
+      }
+
+
+
+      return {
+
+        data:           function() { return processed },
+
+        original:       function() { return original },
+
+        internal:       function() { return data },
+
+        selection:      function() { return merged },
+
+        makeData:       makeData,
+
+        build:          build,
+
+        chart:          function() { return charts[0] },
+
+        group:          function() { return elementGroup },
+
+        fields: {
+
+          x:            ['air_time'],
+
+          y:            ['distance'],
+
+          key:          ['#row'],
+
+          color:        ['carrier'],
+
+          symbol:       ['carrier']
+
+        }
+
+      };
+
+    }();
+
+
+
+    function build(time, noData) {
+
+      var first = elements[0].data() == null;
+
+      if (first) time = 0;                                           // no transition for first call
+
+      buildAxes(time);
+
+      if ((first || time > -1) && !noData) {
+
+        elements[0].makeData();
+
+        BrunelD3.addLegend(legends, legends._legend);
+
+      }
+
+      elements[0].build(time);
+
+    }
+
+
+
+    // Expose the following components of the chart
+
+    return {
+
+      elements : elements,
+
+      interior : interior,
+
+      scales: {x:scale_x, y:scale_y},
+
+      zoom: function(params, time) {
+
+          if (params) zoom.on('zoom').call(zoomNode, params, time);
+
+          return d3.zoomTransform(zoomNode);
+
+      },
+
+      build : build
+
+    };
+
+    }();
+
+
+
+  function setData(rowData, i) { datasets[i||0] = BrunelD3.makeData(rowData) }
+
+  function updateAll(time) { charts.forEach(function(x) {x.build(time || 0)}) }
+
+  function buildAll() {
+
+    for (var i=0;i<arguments.length;i++) setData(arguments[i], i);
+
+    updateAll(transitionTime);
+
+  }
+
+
+
+  return {
+
+    dataPreProcess:     function(f) { if (f) pre = f; return pre },
+
+    dataPostProcess:    function(f) { if (f) post = f; return post },
+
+    data:               function(d,i) { if (d) setData(d,i); return datasets[i||0] },
+
+    visId:              visId,
+
+    build:              buildAll,
+
+    rebuild:            updateAll,
+
+    charts:             charts
+
+  }
+
+}
+
+
+
+// Data Tables /////////////////////////////////////////////////////////////////////////////////////
+
+
+
+var table1 = {
+
+   summarized: false,
+
+   names: ['air_time', 'distance', 'carrier'], 
+
+   options: ['numeric', 'numeric', 'string'], 
+
+   rows: [[227, 1400, 'UA'], [227, 1416, 'UA'], [160, 1089, 'AA'], [183, 1576, 'B6'],
+
+  [116, 762, 'DL'], [150, 719, 'UA'], [158, 1065, 'B6'], [53, 229, 'EV'], [140, 944, 'B6'],
+
+  [138, 733, 'AA'], [149, 1028, 'B6'], [158, 1005, 'B6'], [345, 2475, 'UA'], [361, 2565, 'UA'],
+
+  [257, 1389, 'AA'], [44, 187, 'B6'], [337, 2227, 'UA'], [152, 1076, 'B6'], [134, 762, 'MQ'],
+
+  [147, 1023, 'B6'], [170, 1020, 'DL'], [105, 502, 'MQ'], [152, 1085, 'AA'], [128, 760, 'DL'],
+
+  [157, 1085, 'UA'], [139, 719, 'MQ'], [366, 2586, 'UA'], [175, 1074, 'B6'], [182, 1598, 'B6'],
+
+  [120, 746, 'DL'], [342, 2133, 'US'], [153, 1096, 'AA'], [229, 1416, 'UA'], [190, 1008, 'EV'],
+
+  [166, 1020, 'MQ'], [330, 2153, 'US'], [192, 1598, 'AA'], [366, 2454, 'UA'], [140, 733, 'AA'],
+
+  [40, 185, 'WN'], [91, 529, 'US'], [52, 212, 'EV'], [248, 1389, 'AA'], [144, 950, 'B6'],
+
+  [41, 187, 'B6'], [146, 1023, 'UA'], [91, 529, 'US'], [151, 1065, 'UA'], [63, 301, 'B6'],
+
+  [243, 1620, 'UA'], [380, 2434, 'UA'], [323, 2248, 'B6'], [191, 1182, 'B6'], [149, 1035, 'DL'],
+
+  [294, 1990, 'DL'], [362, 2586, 'DL'], [161, 1096, 'DL'], [143, 733, 'AA'], [142, 944, 'AA'],
+
+  [233, 1147, 'MQ'], [156, 997, 'UA'], [164, 1076, 'DL'], [126, 762, 'DL'], [361, 2475, 'VX'],
+
+  [159, 1096, 'AA'], [156, 1069, 'B6'], [105, 502, 'DL'], [164, 1068, 'UA'], [188, 1608, 'UA'],
+
+  [381, 2475, 'B6'], [135, 733, 'UA'], [190, 1598, 'B6'], [159, 1069, 'AA'], [156, 719, 'UA'],
+
+  [134, 738, 'FL'], [147, 944, 'B6'], [153, 1023, 'UA'], [254, 1389, 'AA'], [338, 2402, 'AS'],
+
+  [238, 1372, 'AA'], [254, 1605, 'UA'], [238, 1416, 'UA'], [356, 2586, 'VX'], [64, 264, 'B6'],
+
+  [167, 1080, 'B6'], [145, 937, 'UA'], [54, 209, 'B6'], [350, 2586, 'B6'], [137, 733, 'AA'],
+
+  [249, 1400, 'UA'], [158, 1010, 'B6'], [358, 2475, 'AA'], [164, 1041, 'B6'], [349, 2422, 'DL'],
+
+  [378, 2586, 'AA'], [373, 2565, 'UA'], [148, 719, 'MQ'], [140, 950, 'DL'], [249, 1620, 'UA'],
+
+  [96, 544, 'US'], [157, 1096, 'AA'], [126, 762, 'DL'], [279, 1620, 'WN'], [142, 937, 'B6'],
+
+  [158, 1089, 'DL'], [171, 1020, 'DL'], [80, 427, 'MQ'], [38, 200, 'B6'], [38, 187, 'AA'],
+
+  [369, 2586, 'UA'], [147, 944, 'DL'], [98, 541, 'B6'], [165, 1069, 'B6'], [101, 479, 'MQ'],
+
+  [126, 760, 'DL'], [132, 820, 'EV'], [189, 1029, '9E'], [149, 1035, 'DL'], [101, 628, 'EV'],
+
+  [118, 544, 'MQ'], [96, 529, 'US'], [180, 946, 'EV'], [267, 1620, 'DL'], [132, 762, 'FL'],
+
+  [86, 340, 'B6'], [190, 1598, 'B6'], [36, 187, 'DL'], [182, 1598, 'DL'], [354, 2446, 'B6'],
+
+  [52, 213, 'MQ'], [91, 419, 'EV'], [96, 541, 'US'], [250, 1372, 'UA'], [169, 888, 'AA'],
+
+  [130, 828, 'B6'], [160, 1089, 'AA'], [357, 2565, 'UA'], [160, 740, 'B6'], [359, 2454, 'UA'],
+
+  [360, 2475, 'UA'], [145, 937, 'UA'], [137, 733, 'AA'], [123, 762, 'MQ'], [92, 550, 'EV'],
+
+  [77, 431, 'MQ'], [257, 1620, 'F9'], [249, 1389, 'AA'], [88, 419, 'MQ'], [188, 1598, 'AA'],
+
+  [108, 509, 'DL'], [157, 1068, 'B6'], [41, 184, 'MQ'], [275, 1874, 'UA'], [75, 416, 'EV'],
+
+  [106, 488, 'DL'], [367, 2425, 'UA'], [146, 711, 'WN'], [159, 1005, 'B6'], [129, 762, 'DL'],
+
+  [358, 2475, 'AA'], [158, 1096, 'DL'], [150, 1023, 'UA'], [659, 4983, 'HA'], [110, 502, 'DL'],
+
+  [125, 746, 'DL'], [343, 2402, 'UA'], [103, 502, 'MQ'], [140, 950, 'DL'], [359, 2475, 'VX'],
+
+  [161, 1065, 'UA'], [145, 719, 'UA'], [142, 764, 'MQ'], [158, 1085, 'UA'], [263, 1521, 'B6'],
+
+  [246, 1605, 'UA'], [52, 266, 'B6'], [32, 96, 'US'], [233, 1400, 'UA'], [184, 1623, 'AA'],
+
+  [166, 1089, 'AA'], [159, 1085, 'UA'], [189, 1634, 'UA'], [238, 1372, 'AA'], [85, 404, 'UA'],
+
+  [258, 1389, 'AA'], [145, 944, 'B6'], [80, 427, 'B6'], [52, 228, 'B6'], [92, 544, 'MQ'],
+
+  [333, 2475, 'DL'], [38, 187, 'B6'], [191, 1608, 'B6'], [151, 1028, 'B6'], [287, 1726, 'UA'],
+
+  [166, 1080, 'DL'], [43, 199, 'EV'], [264, 1605, 'WN'], [149, 997, 'UA'], [161, 1076, 'B6'],
+
+  [154, 733, 'UA'], [324, 2248, 'VX'], [66, 301, 'B6'], [170, 1069, 'B6'], [145, 725, 'WN'],
+
+  [159, 1010, 'DL'], [169, 1047, 'DL'], [154, 1035, 'B6'], [143, 738, 'WN'], [133, 733, 'AA'],
+
+  [129, 762, 'MQ'], [352, 2475, 'B6'], [105, 583, 'EV'], [47, 273, 'B6'], [170, 872, 'EV'],
+
+  [144, 764, 'MQ'], [346, 2454, 'UA'], [324, 2133, 'US'], [129, 762, 'DL'], [37, 200, 'UA'],
+
+  [151, 1076, 'DL'], [90, 544, 'US'], [152, 1065, 'B6'], [342, 2153, 'US'], [254, 1605, 'UA'],
+
+  [131, 719, 'MQ'], [160, 1020, 'DL'], [90, 529, 'US'], [97, 541, 'US'], [59, 229, 'EV'],
+
+  [320, 2248, 'DL'], [129, 762, 'FL'], [59, 282, 'EV'], [78, 431, 'MQ'], [247, 1389, 'AA'],
+
+  [137, 937, 'UA'], [356, 2475, 'AA'], [237, 1416, 'UA'], [389, 2586, 'AA'], [100, 628, 'EV'],
+
+  [363, 2586, 'VX'], [157, 1065, 'UA'], [135, 645, 'EV'], [42, 200, 'UA'], [133, 733, 'AA'],
+
+  [149, 719, 'UA'], [142, 944, 'B6'], [151, 725, 'EV'], [229, 1400, 'UA'], [157, 1068, 'UA'],
+
+  [230, 1389, 'AA'], [295, 1990, 'DL'], [112, 502, 'MQ'], [165, 1076, 'B6'], [129, 762, 'DL'],
+
+  [51, 284, 'EV'], [158, 1010, 'DL'], [50, 214, 'US'], [43, 185, 'WN'], [50, 213, 'MQ'],
+
+  [325, 2227, 'UA'], [145, 1023, 'B6'], [155, 1096, 'DL'], [356, 2565, 'UA'], [95, 479, 'MQ'],
+
+  [157, 1096, 'AA'], [52, 266, 'B6'], [364, 2586, 'UA'], [104, 502, 'DL'], [248, 1416, 'UA'],
+
+  [117, 708, 'EV'], [176, 888, 'WN'], [256, 1620, 'UA'], [349, 2586, 'B6'], [169, 1080, 'DL'],
+
+  [94, 544, 'US'], [73, 416, 'EV'], [357, 2475, 'UA'], [156, 1023, 'UA'], [156, 997, 'UA'],
+
+  [127, 733, 'AA'], [166, 1020, 'DL'], [89, 419, 'MQ'], [168, 1074, 'B6'], [347, 2475, 'VX'],
+
+  [156, 1085, 'AA'], [153, 1035, 'DL'], [371, 2434, 'UA'], [126, 746, 'EV'], [82, 397, 'FL'],
+
+  [46, 195, 'EV'], [95, 463, 'EV'], [167, 1069, 'B6'], [330, 2475, 'DL'], [40, 200, 'B6'],
+
+  [141, 762, 'MQ'], [353, 2475, 'AA'], [160, 1076, 'DL'], [133, 762, 'DL'], [57, 213, 'MQ'],
+
+  [50, 246, 'EV'], [80, 431, 'MQ'], [151, 937, 'UA'], [248, 1389, 'AA'], [38, 169, 'WN'],
+
+  [142, 733, 'UA'], [102, 541, 'US'], [51, 266, 'EV'], [187, 1608, 'UA'], [142, 746, 'EV'],
+
+  [353, 2586, 'VX'], [139, 937, 'B6'], [221, 1400, 'UA'], [59, 282, 'EV'], [253, 1428, 'B6'],
+
+  [102, 529, 'EV'], [143, 719, 'MQ'], [345, 2565, 'UA'], [161, 888, 'AA'], [195, 1183, 'DL'],
+
+  [142, 711, 'WN'], [131, 820, 'EV'], [160, 1005, 'B6'], [339, 2133, 'UA'], [108, 488, 'EV'],
+
+  [108, 502, 'DL'], [156, 1065, 'UA'], [40, 187, 'AA'], [137, 738, 'WN'], [114, 488, 'EV'],
+
+  [156, 1096, 'AA'], [79, 427, 'MQ'], [45, 199, 'EV'], [298, 1990, 'DL'], [188, 1598, 'DL'],
+
+  [70, 301, 'B6'], [238, 1416, 'UA'], [173, 1069, 'B6'], [243, 1389, 'AA'], [252, 1605, 'UA'],
+
+  [132, 762, 'DL'], [264, 1620, 'WN'], [139, 764, 'MQ'], [100, 544, 'US'], [38, 184, 'US'],
+
+  [346, 2465, 'B6'], [97, 479, 'MQ'], [128, 762, 'FL'], [147, 733, 'AA'], [252, 1372, 'AA'],
+
+  [170, 1020, 'MQ'], [243, 1372, 'UA'], [40, 187, 'B6'], [158, 1085, 'UA'], [107, 533, 'EV'],
+
+  [65, 264, 'B6'], [102, 502, 'MQ'], [163, 1089, 'AA'], [239, 1411, 'WN'], [150, 1028, 'B6'],
+
+  [95, 529, 'US'], [33, 143, 'EV'], [38, 169, 'EV'], [80, 431, 'MQ'], [25, 116, 'EV'],
+
+  [140, 950, 'B6'], [334, 2454, 'UA'], [295, 1969, 'DL'], [131, 760, 'DL'], [352, 2475, 'VX'],
+
+  [157, 1065, 'UA'], [149, 645, 'EV'], [134, 828, 'B6'], [69, 319, 'EV'], [352, 2475, 'B6'],
+
+  [161, 1096, 'AA'], [170, 1047, 'B6'], [362, 2475, 'AA'], [194, 872, 'EV'], [235, 1389, 'AA'],
+
+  [656, 4963, 'UA'], [334, 2133, 'WN'], [57, 282, 'EV'], [49, 273, 'B6'], [37, 209, 'EV'],
+
+  [152, 799, 'EV'], [102, 628, 'EV'], [37, 187, 'DL'], [86, 445, 'EV'], [144, 944, 'B6'],
+
+  [141, 725, 'WN'], [98, 544, 'MQ'], [135, 719, 'UA'], [146, 733, 'UA'], [218, 1400, 'UA'],
+
+  [318, 2133, 'US'], [178, 963, 'EV'], [130, 762, 'DL'], [183, 946, 'EV'], [133, 762, 'FL'],
+
+  [154, 1065, 'B6'], [136, 719, 'UA'], [348, 2402, 'UA'], [136, 719, 'MQ'], [38, 187, 'B6'],
+
+  [349, 2422, 'B6'], [160, 1080, 'DL'], [93, 419, 'MQ'], [362, 2586, 'UA'], [53, 229, 'EV'],
+
+  [129, 569, 'EV'], [132, 746, 'EV'], [371, 2465, 'B6'], [149, 1023, 'UA'], [227, 1416, 'UA'],
+
+  [151, 1035, 'B6'], [91, 404, 'UA'], [163, 1020, 'DL'], [375, 2586, 'DL'], [56, 213, 'DL'],
+
+  [94, 502, 'DL'], [141, 944, 'AA'], [51, 212, 'EV'], [147, 733, 'AA'], [129, 762, 'MQ'],
+
+  [161, 1089, 'AA'], [96, 544, 'US'], [78, 427, 'MQ'], [57, 228, '9E'], [68, 301, '9E'],
+
+  [162, 1069, 'B6'], [99, 425, 'MQ'], [51, 214, 'US'], [47, 284, 'EV'], [57, 209, '9E'],
+
+  [340, 2475, 'DL'], [192, 1182, 'B6'], [87, 340, 'B6'], [152, 1035, 'DL'], [140, 733, 'UA'],
+
+  [252, 1504, 'UA'], [166, 1068, 'UA'], [97, 529, 'US'], [94, 479, 'MQ'], [96, 463, 'EV'],
+
+  [152, 997, 'UA'], [167, 1076, 'B6'], [156, 1065, 'UA'], [63, 277, 'EV'], [82, 431, 'MQ'],
+
+  [248, 1389, 'AA'], [237, 1620, 'UA'], [66, 264, '9E'], [130, 665, 'MQ'], [146, 937, 'UA'],
+
+  [156, 997, 'B6'], [135, 762, 'DL'], [60, 292, 'DL'], [142, 944, 'B6'], [102, 529, 'EV'],
+
+  [79, 340, 'MQ'], [171, 1041, 'B6'], [348, 2565, 'UA'], [236, 1372, 'AA'], [57, 213, 'MQ'],
+
+  [152, 937, 'UA'], [145, 950, 'DL'], [98, 483, 'MQ'], [356, 2475, 'UA'], [337, 2454, 'UA'],
+
+  [156, 1028, 'B6'], [152, 937, 'B6'], [null, 1147, 'MQ'], [141, 711, 'WN'], [163, 1069, 'AA'],
+
+  [66, 301, 'B6'], [168, 1074, 'B6'], [210, 1400, 'UA'], [null, 872, 'EV'], [160, 888, 'AA'],
+
+  [138, 719, 'UA'], [103, 544, 'US'], [40, 184, '9E'], [45, 199, 'EV'], [106, 594, 'EV'],
+
+  [247, 1605, 'UA'], [120, 605, 'EV'], [133, 738, 'WN'], [133, 944, 'DL'], [360, 2586, 'AA'],
+
+  [351, 2475, 'AA'], [342, 2227, 'UA'], [193, 1598, 'B6'], [342, 2446, 'DL'], [320, 1990, 'DL'],
+
+  [88, 419, 'UA'], [146, 740, '9E'], [129, 746, 'DL'], [167, 1020, 'MQ'], [234, 1092, 'EV'],
+
+  [156, 1085, 'UA'], [139, 665, '9E'], [55, 229, 'EV'], [132, 762, 'FL'], [150, 765, '9E'],
+
+  [254, 1391, 'AA'], [41, 187, '9E'], [131, 762, 'DL'], [118, 589, 'MQ'], [69, 335, 'EV'],
+
+  [171, 1074, 'DL'], [143, 733, 'UA'], [168, 748, 'EV'], [53, 228, 'EV'], [166, 1065, 'B6'],
+
+  [309, 2248, 'DL'], [35, 94, '9E'], [141, 719, 'UA'], [189, 1107, 'DL'], [58, 282, 'EV'],
+
+  [150, 740, 'B6'], [254, 1605, 'WN'], [79, 431, 'MQ'], [162, 1065, 'UA'], [106, 544, 'MQ'],
+
+  [146, 733, 'AA'], [58, 209, 'B6'], [35, 200, 'UA'], [249, 1389, 'AA'], [171, 1096, 'AA'],
+
+  [137, 944, 'B6'], [155, 1069, 'DL'], [168, 1020, 'DL'], [235, 1620, 'DL'], [328, 2133, 'UA'],
+
+  [73, 319, 'EV'], [136, 762, 'MQ'], [242, 1400, 'UA'], [130, 760, 'DL'], [317, 2153, 'US'],
+
+  [188, 1598, 'AA'], [370, 2475, 'B6'], [108, 509, 'DL'], [159, 1005, 'B6'], [354, 2586, 'VX'],
+
+  [53, 212, 'EV'], [248, 1626, 'DL'], [121, 569, 'EV'], [147, 1028, 'B6'], [48, 199, 'EV'],
+
+  [309, 2133, 'US'], [346, 2425, 'UA'], [181, 888, 'WN'], [139, 719, 'MQ'], [247, 1605, 'UA'],
+
+  [84, 404, 'UA'], [42, 200, 'B6'], [173, 1029, '9E'], [140, 725, 'EV'], [106, 502, 'MQ'],
+
+  [41, 187, 'AA'], [161, 1068, 'UA'], [89, 445, 'EV'], [139, 746, 'EV'], [162, 1010, 'B6'],
+
+  [349, 2446, 'B6'], [252, 1389, 'AA'], [158, 1076, 'DL'], [38, 209, 'EV'], [251, 1521, 'DL'],
+
+  [36, 143, 'EV'], [280, 1747, 'AA'], [357, 2586, 'DL'], [362, 2475, 'VX'], [322, 2248, 'AA'],
+
+  [181, 872, 'WN'], [148, 937, 'UA'], [52, 290, 'MQ'], [247, 1521, 'AA'], [144, 733, 'UA'],
+
+  [234, 1416, 'UA'], [251, 1372, 'AA'], [110, 544, 'US'], [121, 746, 'DL'], [334, 2454, 'UA'],
+
+  [245, 1411, 'WN'], [48, 266, 'EV'], [112, 541, 'B6'], [149, 1035, 'B6'], [241, 1620, 'UA'],
+
+  [242, 1569, 'UA'], [156, 1069, 'B6'], [146, 740, 'AA'], [242, 1620, 'F9'], [183, 1598, 'B6'],
+
+  [143, 719, 'UA'], [141, 733, 'AA'], [189, 1598, 'B6'], [80, 431, 'MQ'], [363, 2475, 'DL'],
+
+  [104, 529, 'US'], [235, 1400, 'UA'], [157, 1089, 'AA'], [347, 2586, 'UA'], [357, 2446, 'AA'],
+
+  [135, 642, 'EV'], [360, 2565, 'UA'], [128, 762, 'FL'], [323, 2153, 'B6'], [344, 2402, 'UA'],
+
+  [119, 533, 'EV'], [176, 1074, 'B6'], [147, 1023, 'B6'], [93, 502, 'DL'], [341, 2454, 'DL'],
+
+  [167, 1096, 'DL'], [null, 1147, 'MQ'], [145, 950, 'DL'], [72, 427, '9E'], [137, 937, 'B6'],
+
+  [160, 1005, 'B6'], [160, 1010, 'DL'], [137, 725, 'WN'], [65, 228, 'B6'], [345, 2475, 'UA'],
+
+  [141, 944, 'B6'], [148, 711, 'WN'], [144, 950, 'B6'], [140, 937, 'UA'], [45, 199, 'EV'],
+
+  [125, 762, 'DL'], [36, 187, 'B6'], [152, 1069, 'B6'], [135, 719, 'UA'], [95, 463, 'EV'],
+
+  [78, 427, 'B6'], [83, 404, 'UA'], [61, 292, 'DL'], [340, 2454, 'UA'], [104, 488, 'EV'],
+
+  [154, 764, 'MQ'], [100, 541, 'US'], [336, 2434, 'UA'], [152, 764, 'MQ'], [null, 2425, 'UA'],
+
+  [336, 2402, 'AS'], [337, 2465, 'B6'], [228, 1372, 'UA'], [177, 872, 'EV'], [334, 2569, 'B6'],
+
+  [213, 1134, 'EV'], [46, 185, 'WN'], [93, 479, 'MQ'], [307, 2227, 'UA'], [138, 733, 'AA'],
+
+  [366, 2454, 'AA'], [158, 1029, 'DL'], [348, 2422, 'AA'], [107, 509, '9E'], [106, 529, 'US'],
+
+  [153, 1096, 'AA'], [334, 2422, 'DL'], [246, 1605, 'UA'], [80, 419, 'EV'], [152, 1023, 'UA'],
+
+  [48, 284, 'EV'], [106, 636, '9E'], [342, 2434, 'UA'], [137, 719, 'MQ'], [123, 733, 'UA'],
+
+  [123, 569, 'EV'], [70, 301, 'B6'], [96, 444, 'MQ'], [357, 2586, 'UA'], [46, 266, 'EV'],
+
+  [149, 1065, 'UA'], [169, 888, 'AA'], [34, 187, 'DL'], [192, 1598, 'DL'], [223, 1389, 'AA'],
+
+  [190, 1598, 'AA'], [361, 2586, 'AA'], [134, 762, 'FL'], [55, 228, 'EV'], [207, 1182, '9E'],
+
+  [364, 2586, 'VX'], [54, 214, 'US'], [87, 419, 'MQ'], [135, 762, 'DL'], [231, 1416, 'UA'],
+
+  [336, 2475, 'AA'], [133, 944, 'B6'], [132, 760, 'DL'], [131, 738, 'WN'], [55, 277, 'EV'],
+
+  [150, 1089, 'DL'], [330, 2576, 'B6'], [133, 944, 'DL'], [150, 997, 'UA'], [361, 2586, 'DL'],
+
+  [159, 1005, 'DL'], [291, 1990, 'B6'], [323, 2248, 'DL'], [159, 748, 'EV'], [141, 740, '9E'],
+
+  [107, 544, 'US'], [81, 431, 'MQ'], [142, 950, 'DL'], [309, 2133, 'UA'], [281, 1990, 'DL'],
+
+  [351, 2565, 'UA'], [136, 733, 'AA'], [105, 529, 'EV'], [314, 2153, 'DL'], [116, 605, 'EV'],
+
+  [333, 2521, 'B6'], [52, 229, 'EV'], [332, 2475, 'DL'], [248, 1372, 'AA'], [75, 427, '9E'],
+
+  [192, 1585, 'UA'], [333, 2446, 'DL'], [154, 765, 'MQ'], [209, 1134, 'EV'], [332, 2475, 'AA'],
+
+  [68, 277, 'EV'], [null, 1391, '9E'], [158, 1005, 'AA'], [36, 200, 'UA'], [152, 1076, 'B6'],
+
+  [60, 213, 'MQ'], [129, 828, '9E'], [106, 628, 'EV'], [309, 2248, 'B6'], [null, 1215, 'EV'],
+
+  [349, 2475, 'VX'], [342, 2402, 'UA'], [76, 340, '9E'], [41, 184, '9E'], [337, 2586, 'B6'],
+
+  [233, 1372, 'UA'], [251, 1587, 'DL'], [232, 1400, 'UA'], [138, 631, 'EV'], [30, 94, '9E'],
+
+  [159, 1096, 'AA'], [154, 1085, 'UA'], [121, 708, 'EV'], [126, 733, 'UA'], [163, 1020, 'MQ'],
+
+  [91, 479, 'MQ'], [65, 319, 'EV'], [77, 404, 'UA'], [35, 187, 'AA'], [62, 301, '9E'],
+
+  [null, 1325, 'EV'], [99, 483, 'MQ'], [91, 425, '9E'], [149, 1069, 'B6'], [157, 1068, 'UA'],
+
+  [73, 397, 'FL'], [255, 1521, 'B6'], [118, 589, '9E'], [328, 2465, 'B6'], [157, 1069, 'DL'],
+
+  [248, 1504, 'UA'], [130, 725, 'EV'], [150, 1028, 'B6'], [134, 711, 'WN'], [33, 209, 'EV'],
+
+  [126, 733, 'AA'], [245, 1428, 'B6'], [195, 1182, 'B6'], [223, 1400, 'UA'], [35, 200, 'UA'],
+
+  [333, 2454, 'UA'], [78, 416, 'EV'], [131, 828, 'B6'], [43, 213, '9E'], [136, 937, 'UA'],
+
+  [83, 427, 'MQ'], [331, 2454, 'B6'], [163, 1074, 'B6'], [102, 502, 'MQ'], [142, 1023, 'UA'],
+
+  [31, 143, 'EV'], [51, 212, 'EV'], [140, 950, 'B6'], [77, 431, 'MQ'], [133, 719, 'MQ'],
+
+  [136, 642, 'EV'], [134, 725, 'WN'], [159, 997, 'UA'], [101, 544, 'MQ'], [34, 187, 'B6'],
+
+  [199, 1608, 'UA'], [309, 2248, 'DL'], [323, 2475, 'B6'], [354, 2565, 'UA'], [138, 937, 'B6'],
+
+  [127, 762, 'MQ'], [65, 277, 'EV'], [115, 589, '9E'], [28, 160, 'EV'], [200, 1017, 'EV'],
+
+  [160, 1076, 'B6'], [143, 937, 'B6'], [153, 764, 'MQ'], [338, 2475, 'AA'], [54, 213, 'MQ'],
+
+  [223, 1626, 'B6'], [152, 1065, 'UA'], [154, 1065, 'B6'], [189, 1598, 'B6'], [140, 944, 'B6'],
+
+  [36, 169, 'EV'], [146, 1085, 'AA'], [143, 1028, 'B6'], [86, 427, 'B6'], [64, 301, 'B6'],
+
+  [191, 1598, 'B6'], [163, 1005, 'B6'], [56, 282, 'EV'], [47, 284, 'EV'], [153, 1069, 'B6'],
+
+  [44, 273, 'B6'], [37, 187, 'B6'], [24, 116, 'EV'], [59, 264, 'B6'], [59, 266, 'B6'],
+
+  [57, 301, 'B6'], [44, 199, 'EV'], [44, 266, 'EV'], [290, 2248, 'B6'], [45, 209, 'B6'],
+
+  [222, 1092, 'EV'], [195, 1617, 'B6'], [185, 1598, 'B6'], [186, 1576, 'B6'], [null, 416, 'EV'],
+
+  [null, 1389, 'AA'], [null, 1096, 'AA'], [null, 1069, 'B6'], [189, 1598, 'B6'], [49, 209, 'B6'],
+
+  [108, 529, 'US'], [214, 1400, 'UA'], [156, 1089, 'AA'], [231, 1416, 'UA'], [184, 1576, 'B6'],
+
+  [156, 1069, 'B6'], [146, 1028, 'B6'], [159, 1076, 'B6'], [255, 1389, 'AA'], [158, 1005, 'B6'],
+
+  [87, 502, 'DL'], [54, 229, 'EV'], [128, 762, 'DL'], [117, 585, 'DL'], [129, 762, 'FL'],
+
+  [341, 2586, 'UA'], [289, 2227, 'UA'], [157, 1085, 'UA'], [98, 463, 'EV'], [155, 1008, 'EV'],
+
+  [120, 569, '9E'], [140, 944, 'B6'], [117, 725, 'WN'], [82, 502, 'MQ'], [125, 733, 'UA'],
+
+  [28, 96, 'US'], [118, 733, 'AA'], [341, 2454, 'UA'], [329, 2565, 'UA'], [129, 760, 'DL'],
+
+  [167, 1020, 'DL'], [151, 1085, 'AA'], [158, 1065, 'B6'], [172, 963, 'EV'], [124, 746, 'DL'],
+
+  [139, 711, 'WN'], [146, 1023, 'B6'], [191, 1598, 'B6'], [354, 2475, 'UA'], [106, 541, 'US'],
+
+  [155, 1096, 'AA'], [159, 1020, 'MQ'], [138, 762, 'MQ'], [106, 544, 'MQ'], [230, 1416, 'UA'],
+
+  [249, 1372, 'UA'], [103, 529, 'US'], [159, 1010, 'DL'], [42, 169, 'WN'], [51, 212, 'EV'],
+
+  [118, 569, 'EV'], [308, 2133, 'US'], [177, 1074, 'B6'], [166, 1076, 'DL'], [42, 185, 'WN'],
+
+  [82, 416, 'EV'], [325, 2454, 'UA'], [123, 733, 'AA'], [248, 1504, 'UA'], [299, 2133, 'UA'],
+
+  [138, 748, 'EV'], [312, 2153, 'US'], [79, 404, 'UA'], [34, 187, 'B6'], [145, 1023, 'UA'],
+
+  [138, 746, 'EV'], [249, 1389, 'AA'], [60, 301, 'B6'], [142, 950, 'B6'], [109, 544, 'US'],
+
+  [218, 1620, 'UA'], [34, 200, 'UA'], [102, 529, 'US'], [274, 1990, 'DL'], [141, 937, 'UA'],
+
+  [323, 2586, 'DL'], [168, 1065, 'UA'], [144, 944, 'AA'], [297, 2248, 'B6'], [317, 2475, 'DL'],
+
+  [162, 1035, 'DL'], [161, 1096, 'DL'], [162, 1069, 'B6'], [233, 1147, 'MQ'], [46, 214, 'US'],
+
+  [330, 2475, 'VX'], [102, 529, 'EV'], [122, 733, 'AA'], [163, 1096, 'AA'], [193, 1183, 'DL'],
+
+  [164, 997, 'UA'], [192, 1182, 'B6'], [90, 502, 'DL'], [194, 1608, 'UA'], [197, 1598, 'AA'],
+
+  [115, 719, 'MQ'], [160, 1089, 'AA'], [327, 2475, 'B6'], [125, 762, 'DL'], [127, 733, 'UA'],
+
+  [161, 1069, 'AA'], [144, 944, 'B6'], [341, 2586, 'UA'], [168, 1068, 'UA'], [112, 719, 'MQ'],
+
+  [314, 2402, 'AS'], [114, 719, 'UA'], [344, 2586, 'VX'], [338, 2434, 'UA'], [251, 1605, 'UA'],
+
+  [113, 738, 'FL'], [168, 1080, 'B6'], [309, 2422, 'DL'], [187, 1598, 'B6'], [351, 2475, 'AA'],
+
+  [50, 209, 'B6'], [230, 1416, 'UA'], [57, 264, 'B6'], [335, 2586, 'B6'], [235, 1411, 'WN'],
+
+  [34, 200, 'UA'], [162, 1010, 'B6'], [121, 733, 'AA'], [353, 2586, 'AA'], [144, 937, 'UA'],
+
+  [263, 1620, 'WN'], [94, 445, 'EV'], [220, 1620, 'UA'], [30, 94, '9E'], [128, 746, 'DL'],
+
+  [244, 1389, 'AA'], [350, 2565, 'UA'], [167, 1041, 'B6'], [151, 1023, 'UA'], [68, 340, '9E'],
+
+  [109, 594, 'EV'], [49, 266, 'EV'], [215, 1400, 'UA'], [46, 199, 'EV'], [143, 950, 'DL'],
+
+  [146, 937, 'B6'], [155, 1069, 'B6'], [123, 762, 'DL'], [155, 1089, 'DL'], [106, 544, 'US'],
+
+  [160, 1096, 'AA'], [38, 200, 'B6'], [143, 944, 'DL'], [241, 1372, 'AA'], [86, 427, 'MQ'],
+
+  [310, 2434, 'UA'], [193, 1623, 'AA'], [170, 1069, 'DL'], [124, 760, 'DL'], [107, 529, 'US'],
+
+  [71, 340, 'B6'], [142, 1020, 'DL'], [253, 1620, 'DL'], [160, 1005, 'DL'], [131, 764, 'MQ'],
+
+  [153, 1035, 'DL'], [90, 479, 'MQ'], [43, 213, 'MQ'], [132, 645, 'EV'], [143, 740, '9E'],
+
+  [37, 187, 'AA'], [108, 541, 'B6'], [330, 2446, 'B6'], [336, 2248, 'DL'], [136, 828, 'B6'],
+
+  [187, 1598, 'B6'], [259, 1372, 'UA'], [343, 2454, 'UA'], [127, 762, 'FL'], [118, 733, 'AA'],
+
+  [169, 1080, 'DL'], [146, 888, 'AA'], [163, 1008, 'DL'], [198, 1134, 'EV'], [239, 1620, 'F9'],
+
+  [188, 1598, 'DL'], [124, 762, 'MQ'], [61, 284, 'EV'], [42, 213, '9E'], [138, 740, 'B6'],
+
+  [47, 246, 'EV'], [229, 1389, 'AA'], [340, 2475, 'UA'], [129, 719, 'UA'], [106, 533, 'EV'],
+
+  [331, 2133, 'WN'], [180, 1008, 'EV'], [87, 427, '9E'], [200, 1598, 'AA'], [83, 431, 'MQ'],
+
+  [349, 2586, 'UA'], [40, 195, 'EV'], [59, 301, '9E'], [71, 419, 'MQ'], [93, 509, '9E'],
+
+  [160, 1005, 'B6'], [242, 1605, 'UA'], [108, 628, 'EV'], [153, 1029, '9E'], [171, 1068, 'B6'],
+
+  [346, 2425, 'UA'], [178, 946, 'EV'], [312, 2402, 'UA'], [336, 2475, 'AA'], [126, 711, 'WN'],
+
+  [88, 488, 'DL'], [310, 2475, 'DL'], [80, 502, 'MQ'], [163, 1089, 'AA'], [125, 746, 'DL'],
+
+  [128, 762, 'DL'], [162, 1096, 'DL'], [350, 2565, 'UA'], [59, 277, 'EV'], [330, 2454, 'UA'],
+
+  [79, 404, 'UA'], [230, 1416, 'UA'], [148, 950, 'DL'], [258, 1874, 'UA'], [107, 719, 'UA'],
+
+  [338, 2475, 'VX'], [51, 266, 'B6'], [null, 1131, 'EV'], [160, 1069, 'B6'], [638, 4983, 'HA'],
+
+  [100, 544, 'US'], [92, 502, 'DL'], [50, 228, 'B6'], [227, 1400, 'UA'], [94, 544, 'MQ'],
+
+  [195, 1634, 'UA'], [39, 187, 'B6'], [109, 605, 'EV'], [237, 1389, 'AA'], [243, 1372, 'AA'],
+
+  [61, 319, 'EV'], [209, 1608, 'B6'], [88, 427, 'B6'], [162, 1076, 'B6'], [308, 2248, 'VX'],
+
+  [137, 820, 'EV'], [251, 1521, 'B6'], [159, 997, 'UA'], [103, 541, 'US'], [164, 1047, 'DL'],
+
+  [261, 1726, 'UA'], [154, 1023, 'UA'], [243, 1605, 'WN'], [156, 1010, 'DL'], [161, 1065, 'UA'],
+
+  [61, 301, 'B6'], [123, 738, 'WN'], [49, 284, 'EV'], [156, 1028, 'B6'], [155, 1035, 'B6'],
+
+  [41, 209, 'EV'], [45, 199, 'EV'], [119, 733, 'AA'], [121, 762, 'MQ'], [82, 416, 'EV'],
+
+  [47, 273, 'B6'], [59, 264, '9E'], [49, 229, 'EV'], [121, 725, 'WN'], [362, 2586, 'DL'],
+
+  [174, 872, 'EV'], [147, 937, 'UA'], [159, 1076, 'DL'], [175, 1065, 'B6'], [292, 2133, 'US'],
+
+  [131, 708, 'EV'], [39, 184, '9E'], [326, 2475, 'B6'], [243, 1605, 'UA'], [103, 544, 'US'],
+
+  [111, 541, 'US'], [112, 719, 'MQ'], [104, 529, 'US'], [310, 2248, 'DL'], [122, 762, 'FL'],
+
+  [303, 2153, 'US'], [126, 762, 'DL'], [225, 1389, 'AA'], [117, 628, 'EV'], [35, 187, 'B6'],
+
+  [157, 1020, 'DL'], [90, 431, 'MQ'], [219, 1416, 'UA'], [126, 746, 'DL'], [357, 2586, 'VX'],
+
+  [51, 282, 'EV'], [40, 200, 'UA'], [100, 583, 'EV'], [146, 944, 'B6'], [181, 1065, 'UA'],
+
+  [128, 645, 'EV'], [344, 2475, 'AA'], [103, 502, 'MQ'], [148, 1023, 'B6'], [168, 963, 'DL'],
+
+  [111, 719, 'UA'], [158, 1076, 'B6'], [134, 764, 'MQ'], [275, 1990, 'DL'], [310, 2565, 'UA'],
+
+  [172, 1068, 'UA'], [228, 1389, 'AA'], [143, 950, 'DL'], [34, 184, 'US'], [144, 944, 'B6'],
+
+  [125, 762, 'DL'], [54, 213, 'MQ'], [314, 2227, 'UA'], [47, 214, 'US'], [187, 1023, 'UA'],
+
+  [330, 2586, 'B6'], [226, 1400, 'UA'], [340, 2586, 'UA'], [35, 185, 'WN'], [168, 1096, 'AA'],
+
+  [53, 266, 'B6'], [92, 502, 'DL'], [89, 479, 'MQ'], [116, 733, 'AA'], [167, 1096, 'DL'],
+
+  [60, 335, 'EV'], [144, 944, 'DL'], [270, 1620, 'UA'], [133, 733, 'AA'], [104, 544, 'US'],
+
+  [86, 488, 'EV'], [null, 618, '9E'], [332, 2475, 'UA'], [169, 1080, 'DL'], [162, 888, 'WN'],
+
+  [168, 1074, 'B6'], [153, 997, 'UA'], [194, 1608, 'UA'], [341, 2475, 'VX'], [175, 1069, 'B6'],
+
+  [148, 1035, 'DL'], [154, 1085, 'AA'], [128, 746, 'DL'], [334, 2434, 'UA'], [158, 1020, 'DL'],
+
+  [157, 1020, 'MQ'], [66, 397, 'FL'], [153, 1010, 'DL'], [55, 213, 'MQ'], [243, 1389, 'AA'],
+
+  [140, 937, 'B6'], [241, 1428, 'B6'], [348, 2475, 'DL'], [125, 762, 'MQ'], [36, 200, 'UA'],
+
+  [35, 200, 'B6'], [196, 1183, 'DL'], [81, 416, 'EV'], [161, 1076, 'DL'], [110, 541, 'US'],
+
+  [176, 872, 'WN'], [232, 1400, 'UA'], [338, 2586, 'VX'], [75, 419, 'MQ'], [341, 2475, 'AA'],
+
+  [50, 284, 'EV'], [86, 431, 'MQ'], [49, 282, 'EV'], [148, 937, 'UA'], [134, 746, 'EV'],
+
+  [246, 1605, 'UA'], [172, 888, 'AA'], [337, 2475, 'B6'], [118, 719, 'MQ'], [161, 1005, 'B6'],
+
+  [316, 2565, 'UA'], [48, 266, 'EV'], [131, 725, 'EV'], [106, 533, 'EV'], [131, 820, 'EV'],
+
+  [90, 488, 'EV'], [85, 427, 'MQ'], [63, 301, 'B6'], [320, 2133, 'UA'], [101, 502, 'DL'],
+
+  [127, 738, 'WN'], [139, 764, 'MQ'], [95, 463, 'EV'], [36, 169, 'WN'], [158, 1096, 'AA'],
+
+  [233, 1372, 'AA'], [264, 1990, 'DL'], [108, 488, 'EV'], [94, 550, 'EV'], [188, 1598, 'DL'],
+
+  [226, 1389, 'AA'], [333, 2465, 'B6'], [36, 187, 'AA'], [225, 1416, 'UA'], [111, 569, '9E'],
+
+  [126, 762, 'DL'], [104, 544, 'US'], [166, 1069, 'B6'], [110, 585, 'DL'], [114, 711, 'WN'],
+
+  [46, 199, 'EV'], [126, 746, 'DL'], [231, 1372, 'UA'], [258, 1620, 'WN'], [84, 479, 'MQ'],
+
+  [159, 1085, 'UA'], [136, 719, 'UA'], [157, 1028, 'B6'], [40, 187, 'B6'], [135, 733, 'AA'],
+
+  [122, 762, 'FL'], [109, 529, 'US'], [88, 445, 'EV'], [144, 950, 'B6'], [340, 2454, 'UA'],
+
+  [240, 1411, 'WN'], [89, 431, 'MQ'], [164, 1065, 'B6'], [130, 760, 'DL'], [361, 2475, 'VX'],
+
+  [54, 282, 'EV'], [339, 2465, 'B6'], [48, 246, 'EV'], [193, 1598, 'B6'], [203, 1092, 'EV'],
+
+  [33, 143, 'EV'], [62, 264, 'B6'], [24, 116, 'EV'], [148, 937, 'B6'], [200, 1134, 'EV'],
+
+  [133, 828, 'B6'], [167, 1047, 'B6'], [172, 1065, 'UA'], [105, 529, 'EV'], [174, 872, 'EV'],
+
+  [344, 2475, 'AA'], [126, 762, 'DL'], [158, 1096, 'AA'], [150, 950, 'DL'], [634, 4963, 'UA'],
+
+  [159, 1089, 'AA'], [103, 544, 'MQ'], [299, 2133, 'US'], [123, 725, 'WN'], [61, 277, 'EV'],
+
+  [323, 2422, 'B6'], [163, 944, 'B6'], [208, 1400, 'UA'], [57, 228, 'EV'], [45, 273, 'B6'],
+
+  [83, 502, 'MQ'], [111, 628, 'EV'], [36, 187, 'DL'], [124, 762, 'FL'], [160, 1096, 'DL'],
+
+  [111, 719, 'MQ'], [150, 937, 'UA'], [341, 2586, 'UA'], [165, 1020, 'MQ'], [37, 169, 'EV'],
+
+  [145, 799, 'EV'], [135, 719, 'UA'], [150, 1023, 'UA'], [122, 762, 'DL'], [154, 1076, 'DL'],
+
+  [52, 229, 'EV'], [347, 2586, 'DL'], [330, 2133, 'WN'], [237, 1416, 'UA'], [87, 404, 'UA'],
+
+  [167, 1041, 'B6'], [179, 946, 'EV'], [148, 1035, 'B6'], [178, 1080, 'DL'], [159, 1020, 'DL'],
+
+  [60, 213, 'DL'], [94, 544, 'US'], [61, 301, 'B6'], [59, 301, '9E'], [81, 425, 'MQ'],
+
+  [93, 541, '9E'], [157, 1028, 'B6'], [91, 502, 'DL'], [158, 1065, 'UA'], [196, 1182, 'B6'],
+
+  [168, 1076, 'B6'], [160, 997, 'UA'], [200, 1107, 'DL'], [177, 872, 'EV'], [161, 1096, 'AA'],
+
+  [36, 187, 'B6'], [155, 1035, 'DL'], [53, 214, 'US'], [71, 340, 'B6'], [143, 937, 'UA'],
+
+  [57, 290, '9E'], [124, 733, 'AA'], [126, 762, 'MQ'], [91, 529, 'US'], [126, 762, 'DL'],
+
+  [82, 479, 'MQ'], [341, 2475, 'DL'], [324, 2402, 'UA'], [41, 184, 'US'], [223, 1372, 'AA'],
+
+  [44, 200, 'UA'], [163, 1089, 'AA'], [160, 1005, 'B6'], [116, 665, 'MQ'], [56, 228, '9E'],
+
+  [161, 997, 'B6'], [239, 1504, 'UA'], [51, 266, 'EV'], [109, 594, 'EV'], [129, 719, 'UA'],
+
+  [123, 738, 'WN'], [148, 888, 'AA'], [230, 1389, 'AA'], [70, 419, 'MQ'], [346, 2454, 'UA'],
+
+  [205, 1400, 'UA'], [243, 1605, 'UA'], [41, 184, '9E'], [236, 1620, 'DL'], [58, 292, '9E'],
+
+  [59, 213, 'MQ'], [341, 2475, 'UA'], [150, 944, 'B6'], [94, 544, 'US'], [49, 209, '9E'],
+
+  [91, 544, 'MQ'], [85, 427, 'MQ'], [121, 569, 'EV'], [159, 1069, 'AA'], [71, 340, 'MQ'],
+
+  [299, 2227, 'UA'], [354, 2586, 'AA'], [170, 1069, 'B6'], [156, 1010, 'DL'], [216, 1147, 'MQ'],
+
+  [80, 431, 'MQ'], [150, 937, 'UA'], [54, 264, '9E'], [94, 483, 'MQ'], [150, 944, 'DL'],
+
+  [195, 1598, 'B6'], [152, 950, 'DL'], [150, 740, '9E'], [229, 1389, 'AA'], [129, 746, 'DL'],
+
+  [167, 1029, '9E'], [79, 419, 'UA'], [166, 1068, 'UA'], [63, 319, 'EV'], [169, 1074, 'B6'],
+
+  [151, 740, 'B6'], [331, 2446, 'DL'], [277, 1990, 'DL'], [119, 760, 'DL'], [47, 254, 'EV'],
+
+  [305, 2454, 'DL'], [155, 1096, 'AA'], [211, 1092, 'EV'], [153, 1035, 'B6'], [174, 1074, 'DL'],
+
+  [168, 1065, 'UA'], [230, 1391, 'AA'], [170, 1065, 'B6'], [161, 1085, 'UA'], [130, 762, 'FL'],
+
+  [118, 589, 'MQ'], [125, 733, 'UA'], [92, 463, 'EV'], [139, 765, '9E'], [38, 200, 'UA'],
+
+  [46, 187, '9E'], [109, 605, 'EV'], [320, 2248, 'DL'], [168, 963, 'DL'], [154, 725, 'EV'],
+
+  [76, 431, 'MQ'], [48, 209, 'B6'], [165, 1069, 'DL'], [126, 762, 'DL'], [340, 2133, 'UA'],
+
+  [29, 94, '9E'], [346, 2586, 'AA'], [41, 199, 'EV'], [190, 1598, 'AA'], [151, 944, 'B6'],
+
+  [56, 229, 'EV'], [83, 427, '9E'], [157, 1010, 'B6'], [136, 764, 'MQ'], [116, 665, '9E'],
+
+  [246, 1605, 'WN'], [129, 733, 'AA'], [333, 2565, 'UA'], [220, 1400, 'UA'], [166, 964, '9E'],
+
+  [97, 502, 'DL'], [166, 1068, 'UA'], [57, 212, 'EV'], [323, 2422, 'DL'], [321, 2475, 'B6'],
+
+  [96, 509, 'DL'], [75, 404, 'UA'], [156, 1020, 'DL'], [346, 2586, 'VX'], [242, 1626, 'DL'],
+
+  [319, 2425, 'UA'], [152, 888, 'WN'], [303, 2133, 'US'], [121, 642, 'EV'], [172, 1074, 'B6'],
+
+  [157, 1089, 'DL'], [240, 1389, 'AA'], [58, 284, 'EV'], [115, 719, 'MQ'], [142, 937, 'UA'],
+
+  [244, 1605, 'UA'], [45, 187, 'AA'], [91, 541, 'B6'], [260, 1569, 'UA'], [38, 200, 'B6'],
+
+  [343, 2586, 'DL'], [108, 585, 'DL'], [330, 2475, 'VX'], [243, 1521, 'DL'], [111, 589, '9E'],
+
+  [159, 872, 'WN'], [331, 2248, 'AA'], [149, 1028, 'B6'], [88, 502, 'MQ'], [334, 2446, 'B6'],
+
+  [138, 733, 'UA'], [122, 708, 'EV'], [260, 1747, 'AA'], [100, 544, 'US'], [233, 1372, 'AA'],
+
+  [238, 1416, 'UA'], [148, 748, 'EV'], [233, 1620, 'UA'], [332, 2454, 'UA'], [125, 746, 'EV'],
+
+  [127, 711, 'WN'], [155, 1005, 'B6'], [55, 290, 'MQ'], [252, 1521, 'AA'], [335, 2475, 'AA'],
+
+  [125, 740, 'AA'], [134, 765, 'MQ'], [130, 762, 'FL'], [159, 1076, 'DL'], [129, 762, 'DL'],
+
+  [277, 1969, 'DL'], [381, 2475, 'DL'], [156, 1089, 'AA'], [351, 2434, 'UA'], [91, 529, 'US'],
+
+  [39, 199, 'EV'], [48, 212, 'EV'], [238, 1620, 'F9'], [248, 1372, 'UA'], [128, 762, 'DL'],
+
+  [226, 1400, 'UA'], [328, 2586, 'UA'], [52, 266, 'B6'], [127, 762, 'MQ'], [344, 2446, 'AA'],
+
+  [341, 2425, 'UA'], [113, 569, 'EV'], [127, 733, 'AA'], [322, 2454, 'DL'], [319, 2446, 'DL'],
+
+  [102, 488, 'EV'], [216, 1147, 'MQ'], [143, 937, 'UA'], [245, 1389, 'AA'], [153, 944, 'B6'],
+
+  [78, 502, 'DL'], [157, 950, 'DL'], [31, 143, 'EV'], [325, 2475, 'UA'], [85, 431, 'MQ'],
+
+  [134, 719, 'UA'], [49, 266, 'EV'], [43, 187, 'B6'], [52, 228, 'B6'], [124, 711, 'WN'],
+
+  [121, 725, 'WN'], [149, 944, 'AA'], [159, 1069, 'B6'], [83, 445, 'EV'], [51, 282, 'EV'],
+
+  [348, 2586, 'AA'], [161, 1085, 'AA'], [160, 1069, 'B6'], [39, 209, 'EV'], [81, 427, 'B6'],
+
+  [127, 762, 'DL'], [64, 340, '9E'], [312, 2153, 'US'], [144, 1020, 'DL'], [67, 404, 'UA'],
+
+  [137, 746, 'EV'], [134, 764, 'MQ'], [81, 479, 'MQ'], [78, 416, 'EV'], [341, 2454, 'UA'],
+
+  [150, 1023, 'B6'], [129, 733, 'UA'], [53, 277, 'EV'], [164, 1096, 'AA'], [299, 2153, 'B6'],
+
+  [243, 1411, 'WN'], [40, 185, 'WN'], [317, 2465, 'B6'], [355, 2565, 'UA'], [332, 2402, 'AS'],
+
+  [44, 199, 'EV'], [74, 419, 'MQ'], [104, 636, '9E'], [325, 2422, 'DL'], [137, 719, 'UA'],
+
+  [99, 529, 'US'], [151, 1029, 'DL'], [95, 509, 'DL'], [350, 2434, 'UA'], [35, 169, 'EV'],
+
+  [294, 2227, 'UA'], [122, 746, 'DL'], [323, 2569, 'B6'], [238, 1605, 'UA'], [36, 184, 'MQ'],
+
+  [158, 950, 'B6'], [57, 335, 'DL'], [161, 1065, 'UA'], [95, 541, 'US'], [321, 2465, 'B6'],
+
+  [192, 1598, 'DL'], [337, 2422, 'AA'], [36, 169, 'WN'], [328, 2576, 'B6'], [38, 187, 'DL'],
+
+  [322, 2402, 'UA'], [163, 1020, 'MQ'], [339, 2586, 'UA'], [131, 569, '9E'], [176, 872, 'EV'],
+
+  [null, 1391, '9E'], [349, 2454, 'AA'], [null, 1092, 'EV'], [155, 888, 'AA'], [353, 2586, 'VX'],
+
+  [123, 719, 'MQ'], [129, 762, 'FL'], [191, 1598, 'AA'], [125, 762, 'DL'], [48, 214, 'US'],
+
+  [53, 228, 'EV'], [127, 760, 'DL'], [371, 2475, 'DL'], [130, 738, 'WN'], [154, 944, 'B6'],
+
+  [191, 1598, 'B6'], [93, 544, 'US'], [58, 301, 'B6'], [50, 292, 'DL'], [151, 944, 'DL'],
+
+  [151, 1023, 'UA'], [230, 1372, 'AA'], [336, 2248, 'DL'], [143, 748, 'EV'], [333, 2475, 'AA'],
+
+  [123, 733, 'AA'], [238, 1620, 'DL'], [344, 2565, 'UA'], [102, 533, 'EV'], [157, 1005, 'DL'],
+
+  [328, 2521, 'B6'], [272, 1990, 'B6'], [230, 1416, 'UA'], [143, 740, '9E'], [311, 2133, 'UA'],
+
+  [197, 1183, 'DL'], [312, 2153, 'DL'], [80, 431, 'MQ'], [180, 1017, 'EV'], [81, 444, 'MQ'],
+
+  [153, 950, 'DL'], [158, 1089, 'DL'], [47, 229, 'EV'], [221, 1389, 'AA'], [155, 1010, 'DL'],
+
+  [149, 1028, 'B6'], [null, 1587, '9E'], [256, 1990, 'DL'], [154, 1035, 'DL'], [150, 937, 'B6'],
+
+  [80, 483, 'MQ'], [178, 1080, 'DL'], [97, 529, 'EV'], [341, 2586, 'DL'], [39, 200, 'UA'],
+
+  [160, 1005, 'AA'], [208, 1134, 'EV'], [54, 277, 'EV'], [91, 425, '9E'], [321, 2402, 'UA'],
+
+  [158, 997, 'UA'], [48, 284, 'EV'], [116, 589, '9E'], [128, 828, '9E'], [93, 541, '9E'],
+
+  [165, 1076, 'B6'], [209, 1400, 'UA'], [300, 2248, 'B6'], [121, 647, '9E'], [130, 733, 'AA'],
+
+  [82, 427, '9E'], [125, 762, 'DL'], [335, 2475, 'VX'], [81, 502, 'DL'], [250, 1215, 'EV'],
+
+  [320, 2586, 'B6'], [137, 733, 'UA'], [30, 94, '9E'], [155, 1096, 'AA'], [164, 1085, 'UA'],
+
+  [49, 213, 'MQ'], [152, 1076, 'DL'], [48, 199, 'EV'], [122, 711, 'WN'], [124, 762, 'MQ'],
+
+  [74, 404, 'UA'], [42, 187, 'AA'], [69, 397, 'FL'], [325, 2454, 'B6'], [198, 1182, 'B6'],
+
+  [83, 479, 'MQ'], [221, 1372, 'UA'], [70, 340, '9E'], [160, 1069, 'B6'], [127, 760, 'DL'],
+
+  [131, 725, 'EV'], [158, 1069, 'DL'], [259, 1521, 'B6'], [252, 1504, 'UA'], [244, 1428, 'B6'],
+
+  [202, 1182, '9E'], [85, 427, 'MQ'], [151, 937, 'UA'], [42, 213, '9E'], [345, 2454, 'UA'],
+
+  [38, 209, 'EV'], [190, 1585, 'UA'], [53, 282, 'EV'], [126, 733, 'AA'], [139, 828, 'B6'],
+
+  [null, 1074, 'B6'], [103, 463, 'EV'], [143, 866, 'EV'], [116, 631, 'EV'], [316, 2475, 'B6'],
+
+  [85, 502, 'MQ'], [128, 719, 'MQ'], [78, 416, 'EV'], [105, 628, 'EV'], [316, 2565, 'UA'],
+
+  [146, 937, 'B6'], [148, 950, 'B6'], [131, 725, 'WN'], [149, 1023, 'UA'], [367, 2475, 'DL'],
+
+  [92, 544, 'MQ'], [79, 431, 'MQ'], [223, 1400, 'UA'], [156, 1065, 'UA'], [162, 997, 'UA'],
+
+  [47, 212, 'EV'], [41, 200, 'UA'], [304, 2248, 'DL'], [132, 642, 'EV'], [113, 605, 'EV'],
+
+  [146, 937, 'B6'], [135, 764, 'MQ'], [63, 301, '9E'], [240, 1626, 'B6'], [50, 277, 'EV'],
+
+  [190, 1608, 'UA'], [29, 160, 'EV'], [162, 1005, 'B6'], [158, 1076, 'B6'], [307, 2248, 'B6'],
+
+  [228, 1620, 'UA'], [340, 2475, 'AA'], [194, 1598, 'B6'], [63, 301, 'B6'], [151, 1028, 'B6'],
+
+  [153, 1065, 'B6'], [159, 1096, 'DL'], [null, 1068, 'UA'], [30, 143, 'EV'], [39, 184, '9E'],
+
+  [83, 427, 'B6'], [159, 1069, 'B6'], [46, 269, 'DL'], [286, 1325, 'EV'], [191, 1598, 'B6'],
+
+  [45, 273, 'B6'], [53, 264, 'B6'], [47, 284, 'EV'], [25, 116, 'EV'], [124, 762, 'DL'],
+
+  [59, 301, 'B6'], [37, 169, 'EV'], [50, 213, 'MQ'], [47, 266, 'EV'], [140, 944, 'B6'],
+
+  [55, 266, 'B6'], [195, 1617, 'B6'], [180, 1576, 'B6'], [null, 569, 'EV'], [null, 319, 'EV'],
+
+  [null, 209, 'EV'], [null, 746, 'EV'], [null, 645, 'EV'], [null, 2475, 'AA'], [null, 1389, 'AA'],
+
+  [null, 719, 'UA'], [193, 1598, 'B6'], [58, 301, 'B6'], [186, 1576, 'B6'], [94, 529, 'US'],
+
+  [238, 1400, 'UA'], [241, 1416, 'UA'], [158, 1089, 'AA'], [191, 1576, 'B6'], [152, 944, 'B6'],
+
+  [99, 502, 'DL'], [57, 228, 'EV'], [164, 1069, 'B6'], [128, 762, 'MQ'], [128, 719, 'MQ'],
+
+  [56, 212, 'EV'], [153, 1023, 'B6'], [163, 1076, 'B6'], [128, 762, 'DL'], [100, 502, 'MQ'],
+
+  [31, 96, 'US'], [124, 725, 'EV'], [149, 1028, 'B6'], [172, 1005, 'B6'], [99, 488, 'DL'],
+
+  [52, 229, 'EV'], [135, 762, 'FL'], [132, 733, 'AA'], [64, 404, 'UA'], [129, 725, 'WN'],
+
+  [39, 169, 'WN'], [324, 2586, 'UA'], [159, 1085, 'AA'], [167, 1096, 'AA'], [188, 1074, 'B6'],
+
+  [144, 1008, 'EV'], [135, 746, 'DL'], [135, 760, 'DL'], [83, 431, 'MQ'], [98, 541, 'US'],
+
+  [149, 1020, 'DL'], [335, 2475, 'UA'], [190, 1598, 'B6'], [202, 1598, 'AA'], [162, 1023, 'UA'],
+
+  [242, 1389, 'AA'], [160, 1065, 'B6'], [206, 1183, 'DL'], [99, 529, 'US'], [292, 2133, 'UA'],
+
+  [292, 2153, 'US'], [98, 529, 'EV'], [174, 1085, 'UA'], [103, 544, 'US'], [85, 416, 'EV'],
+
+  [35, 200, 'UA'], [98, 544, 'MQ'], [68, 319, 'EV'], [333, 2133, 'US'], [43, 185, 'WN'],
+
+  [264, 1504, 'UA'], [248, 1389, 'AA'], [331, 2565, 'UA'], [129, 645, 'EV'], [229, 1416, 'UA'],
+
+  [154, 748, 'EV'], [37, 187, 'B6'], [56, 292, 'EV'], [138, 642, 'EV'], [60, 301, 'B6'],
+
+  [97, 529, 'US'], [154, 950, 'B6'], [217, 1620, 'UA'], [272, 1990, 'DL'], [339, 2586, 'DL'],
+
+  [158, 950, 'DL'], [284, 2227, 'UA'], [129, 762, 'DL'], [168, 1096, 'DL'], [46, 214, 'US'],
+
+  [319, 2475, 'DL'], [212, 1167, 'EV'], [158, 944, 'AA'], [165, 1069, 'B6'], [294, 2248, 'B6'],
+
+  [164, 1076, 'DL'], [316, 2475, 'VX'], [126, 719, 'UA'], [95, 488, 'EV'], [313, 2475, 'B6'],
+
+  [326, 2434, 'UA'], [219, 1605, 'UA'], [213, 1147, 'MQ'], [204, 1182, 'B6'], [167, 1065, 'UA'],
+
+  [246, 1411, 'WN'], [307, 2454, 'UA'], [158, 937, 'UA'], [190, 1598, 'B6'], [134, 733, 'UA'],
+
+  [169, 1089, 'AA'], [171, 1069, 'AA'], [123, 738, 'FL'], [122, 569, 'EV'], [166, 1068, 'UA'],
+
+  [92, 502, 'DL'], [336, 2586, 'UA'], [156, 944, 'B6'], [134, 719, 'MQ'], [147, 1023, 'UA'],
+
+  [325, 2402, 'AS'], [184, 1080, 'B6'], [226, 1372, 'AA'], [333, 2586, 'VX'], [59, 264, 'B6'],
+
+  [132, 746, 'DL'], [313, 2475, 'AA'], [230, 1400, 'UA'], [49, 209, 'B6'], [332, 2422, 'DL'],
+
+  [246, 1416, 'UA'], [133, 746, 'EV'], [158, 997, 'UA'], [336, 2586, 'AA'], [327, 2586, 'B6'],
+
+  [173, 1010, 'B6'], [129, 719, 'UA'], [95, 340, '9E'], [113, 569, '9E'], [149, 1020, 'DL'],
+
+  [127, 762, 'DL'], [159, 1008, 'EV'], [158, 937, 'B6'], [194, 1608, 'UA'], [163, 1089, 'DL'],
+
+  [233, 1620, 'WN'], [337, 2586, 'UA'], [223, 1372, 'UA'], [164, 1029, '9E'], [165, 1069, 'B6'],
+
+  [172, 1069, 'DL'], [326, 2133, 'WN'], [103, 544, 'US'], [192, 1134, 'EV'], [79, 427, 'MQ'],
+
+  [219, 1620, 'UA'], [179, 1041, 'B6'], [134, 762, 'FL'], [36, 200, 'B6'], [34, 187, 'AA'],
+
+  [211, 1623, 'AA'], [157, 944, 'DL'], [175, 1005, 'DL'], [77, 340, 'B6'], [183, 1010, 'DL'],
+
+  [134, 760, 'DL'], [293, 2248, 'DL'], [96, 479, 'MQ'], [99, 529, 'US'], [123, 740, '9E'],
+
+  [222, 1620, 'DL'], [37, 209, 'EV'], [149, 764, 'MQ'], [57, 213, 'MQ'], [102, 541, 'US'],
+
+  [187, 946, 'EV'], [91, 427, '9E'], [91, 445, 'EV'], [321, 2475, 'UA'], [133, 740, 'B6'],
+
+  [168, 1035, 'DL'], [189, 1065, 'UA'], [196, 1598, 'DL'], [158, 937, 'UA'], [151, 820, 'EV'],
+
+  [116, 605, 'EV'], [100, 550, 'EV'], [129, 762, 'MQ'], [83, 416, 'EV'], [219, 1620, 'F9'],
+
+  [118, 711, 'WN'], [61, 277, 'EV'], [43, 213, '9E'], [33, 187, '9E'], [140, 828, 'B6'],
+
+  [316, 2446, 'B6'], [324, 2565, 'UA'], [39, 200, 'UA'], [168, 1068, 'B6'], [81, 419, 'MQ'],
+
+  [195, 1598, 'B6'], [306, 2425, 'UA'], [165, 1005, 'B6'], [196, 1131, 'EV'], [107, 488, 'EV'],
+
+  [126, 645, 'EV'], [50, 284, 'EV'], [167, 1096, 'AA'], [94, 488, 'DL'], [97, 509, '9E'],
+
+  [131, 762, 'DL'], [99, 544, 'US'], [133, 733, 'AA'], [190, 1092, 'EV'], [323, 2475, 'AA'],
+
+  [327, 2475, 'DL'], [108, 569, 'EV'], [106, 533, 'EV'], [130, 746, 'DL'], [157, 950, 'DL'],
+
+  [105, 502, 'MQ'], [322, 2475, 'VX'], [219, 1605, 'UA'], [41, 184, '9E'], [160, 1089, 'AA'],
+
+  [238, 1400, 'UA']]
+
+};
+
+
+
+// Call Code to Build the system ///////////////////////////////////////////////////////////////////
+
+
+
+var v  = new BrunelVis('visualization');
+
+v.build(table1);
+
 
 </script>
 </body>
